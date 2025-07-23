@@ -1,0 +1,86 @@
+# 🔐 SECURITY - API Keys and Secrets
+secrets.json
+.env
+.env.local
+.env.production
+
+# 📦 ARCHIVE - Unused/development files
+archive/
+
+# 📁 Local Database and Data Files
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 📄 Uploaded Documents (sensitive user data)
+data/documents/
+uploads/
+documents/
+
+# 🧪 Test Files and Scripts
+test_*.py
+migrate_*.py
+*_test.py
+
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 💻 IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 🔧 OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 📊 Jupyter Notebooks
+.ipynb_checkpoints
+
+# 🌐 Streamlit
+.streamlit/secrets.toml
+
+# 📝 Logs
+*.log
+logs/
+
+# 🔄 Temporary Files
+tmp/
+temp/
+*.tmp
+
+# 🛠 Build Tools
+node_modules/
+.npm
+.yarn/
+yarn-error.log
