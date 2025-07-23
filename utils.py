@@ -5,6 +5,14 @@ import openai
 from datetime import datetime
 import os
 
+# LangChain imports
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain.agents import AgentExecutor
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+
 def read_secrets():
     """Read secrets from Streamlit secrets or environment variables."""
     try:
@@ -47,6 +55,36 @@ def init_openai_client():
     except Exception as e:
         st.error(f"Error initializing OpenAI client: {str(e)}")
         return None
+
+def init_langchain_llm():
+    """Initialize LangChain ChatOpenAI instance."""
+    if not LANGCHAIN_AVAILABLE:
+        st.error("LangChain not available. Please install required packages.")
+        return None
+    
+    secrets = read_secrets()
+    api_key = secrets.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+    
+    if not api_key:
+        st.error("OpenAI API key not found for LangChain initialization.")
+        return None
+    
+    try:
+        return ChatOpenAI(
+            model="gpt-4",
+            temperature=0.7,
+            openai_api_key=api_key
+        )
+    except Exception as e:
+        st.error(f"Error initializing LangChain LLM: {str(e)}")
+        return None
+
+def check_langchain_status():
+    """Check if LangChain is properly configured."""
+    return {
+        'available': LANGCHAIN_AVAILABLE,
+        'api_key_configured': bool(read_secrets().get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY'))
+    }
 
 def get_db_connection():
     """Get SQLite database connection."""

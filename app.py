@@ -19,13 +19,22 @@ from utils import (
     init_db,
     ensure_directories,
     get_custom_css,
-    get_menu_style
+    get_menu_style,
+    check_langchain_status
 )
 from streamlit_echarts import st_echarts
 from dashboard_utils import prepare_dashboard_data, show_metrics
 from user_portal import show_user_portal
 from jobs_portal import show_jobs_portal
 from login import show_login_page, init_auth_db
+
+# LangChain agent imports
+try:
+    from ai_agent import JobApplicationAgent, get_prompt_template, COMMON_PROMPTS
+    LANGCHAIN_AGENT_AVAILABLE = True
+except ImportError as e:
+    st.error(f"LangChain agent not available: {str(e)}")
+    LANGCHAIN_AGENT_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -119,52 +128,125 @@ def save_jobs_to_database(jobs_df):
     finally:
         conn.close()
 
-# Page 1: AI Chat Bot
+# Page 1: AI Job Assistant (LangChain Agent)
 def show_ai_chatbot():
-    st.title("AI Job Assistant")
+    st.title("🤖 AI Job Assistant")
     
-    if client is None:
-        st.error("OpenAI API key not configured. Please set up your API key to use the AI Chat Bot.")
+    # Check if LangChain is available
+    if not LANGCHAIN_AGENT_AVAILABLE:
+        st.error("LangChain AI Agent is not available. Please check your installation and API keys.")
+        st.info("Falling back to basic chat mode...")
+        _show_basic_chatbot()
         return
     
-    # Authentication is now handled at the main app level
+    # Check API key configuration
+    langchain_status = check_langchain_status()
+    if not langchain_status['api_key_configured']:
+        st.error("OpenAI API key not configured. Please set up your API key to use the AI Assistant.")
+        return
+    
     user_id = st.session_state.get('user_id')
     
-    # Load jobs for selection (filtered by user)
+    # Initialize the agent
+    if 'job_agent' not in st.session_state:
+        with st.spinner("Initializing AI Assistant..."):
+            st.session_state.job_agent = JobApplicationAgent(user_id=user_id)
+    
+    agent = st.session_state.job_agent
+    
+    # Create two columns for layout
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("💬 Chat with Your AI Assistant")
+        
+        # Display chat messages
+        if hasattr(agent, 'memory') and agent.memory.messages:
+            for message in agent.memory.messages:
+                if hasattr(message, 'type'):
+                    role = 'user' if message.type == 'human' else 'assistant'
+                    with st.chat_message(role):
+                        st.markdown(message.content)
+        
+        # Chat input
+        if prompt := st.chat_input("Ask me anything about your job search!"):
+            # Display user message
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            
+            # Get agent response
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    response = agent.chat(prompt)
+                    st.markdown(response)
+    
+    with col2:
+        st.subheader("🎯 Quick Actions")
+        
+        # Get available jobs for quick reference
+        jobs_df = agent.get_available_jobs()
+        
+        if not jobs_df.empty:
+            st.write("**Your Jobs:**")
+            for _, job in jobs_df.head(5).iterrows():
+                st.write(f"• **ID {job['id']}**: {job['company_name']} - {job['job_title']}")
+            
+            st.write("---")
+            
+            # Quick action buttons
+            st.write("**Try these prompts:**")
+            
+            if st.button("📊 Analyze a job", key="analyze_btn"):
+                if not jobs_df.empty:
+                    job_id = jobs_df.iloc[0]['id']
+                    prompt = get_prompt_template('analyze_job', job_id=job_id)
+                    response = agent.chat(prompt)
+                    st.text_area("Analysis:", response, height=200)
+            
+            if st.button("🎯 Help me apply", key="apply_btn"):
+                if not jobs_df.empty:
+                    job_id = jobs_df.iloc[0]['id']
+                    prompt = get_prompt_template('help_apply', job_id=job_id)
+                    response = agent.chat(prompt)
+                    st.text_area("Application Strategy:", response, height=200)
+            
+            if st.button("🏢 Research company", key="research_btn"):
+                if not jobs_df.empty:
+                    company = jobs_df.iloc[0]['company_name']
+                    prompt = get_prompt_template('research_company', company_name=company)
+                    response = agent.chat(prompt)
+                    st.text_area("Company Research:", response, height=200)
+        
+        else:
+            st.info("No jobs found. Add some jobs in the Job Portal to get started!")
+        
+        st.write("---")
+        
+        # Suggested next actions
+        st.write("**💡 Suggestions:**")
+        suggestions = agent.suggest_next_actions()
+        for suggestion in suggestions:
+            st.write(suggestion)
+        
+        # Clear conversation button
+        if st.button("🗑️ Clear Conversation", key="clear_btn"):
+            agent.clear_memory()
+            st.rerun()
+
+# Fallback basic chatbot function
+def _show_basic_chatbot():
+    """Fallback to basic OpenAI chatbot if LangChain is not available."""
+    st.subheader("Basic Chat Mode")
+    
+    if client is None:
+        st.error("OpenAI client not available.")
+        return
+    
+    user_id = st.session_state.get('user_id')
+    
+    # Load jobs for selection
     conn = get_db_connection()
     jobs_df = pd.read_sql_query("SELECT id, company_name, job_title FROM jobs WHERE user_id = ?", conn, params=(user_id,))
-    
-    # Load resume from documents database (filtered by user)
-    resume_df = pd.read_sql_query("SELECT * FROM documents WHERE document_type = 'Resume' AND user_id = ? ORDER BY upload_date DESC LIMIT 1", conn, params=(user_id,))
-    resume_content = ""
-    if not resume_df.empty:
-        resume_path = resume_df['file_path'].iloc[0]
-        try:
-            file_extension = resume_path.split('.')[-1].lower()
-            if file_extension == 'pdf':
-                reader = PdfReader(resume_path)
-                resume_content = "\n".join([page.extract_text() for page in reader.pages])
-            elif file_extension == 'docx':
-                doc = Document(resume_path)
-                resume_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-            elif file_extension == 'txt':
-                with open(resume_path, 'r', encoding='utf-8') as file:
-                    resume_content = file.read()
-        except Exception as e:
-            st.warning(f"Could not load resume content: {str(e)}")
-    
-    # Load career goals (filtered by user)
-    goals_df = pd.read_sql_query("SELECT * FROM career_goals WHERE user_id = ? ORDER BY submission_date DESC LIMIT 1", conn, params=(user_id,))
-    career_goals = goals_df['goals'].iloc[0] if not goals_df.empty else "No career goals have been set yet."
-    
-    # Load cover letter preferences
-    try:
-        with open('robs_cover_letter_preferences.md', 'r', encoding='utf-8') as file:
-            cover_letter_preferences = file.read()
-    except Exception as e:
-        st.warning(f"Could not load cover letter preferences: {str(e)}")
-        cover_letter_preferences = "No cover letter preferences found."
-    
     conn.close()
     
     if not jobs_df.empty:
@@ -173,15 +255,15 @@ def show_ai_chatbot():
             jobs_df.apply(lambda x: f"{x['company_name']} - {x['job_title']}", axis=1)
         )
         
-        if 'messages' not in st.session_state:
-            st.session_state.messages = []
+        if 'basic_messages' not in st.session_state:
+            st.session_state.basic_messages = []
             
-        for message in st.session_state.messages:
+        for message in st.session_state.basic_messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
                 
-        if prompt := st.chat_input("What would you like to know about this job?"):
-            st.session_state.messages.append({"role": "user", "content": prompt})
+        if prompt := st.chat_input("What would you like to know?"):
+            st.session_state.basic_messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
                 
@@ -191,27 +273,10 @@ def show_ai_chatbot():
             job_details = pd.read_sql_query("SELECT * FROM jobs WHERE id = ? AND user_id = ?", conn, params=(job_id, user_id))
             conn.close()
             
-            # Prepare system message with job, resume, career goals, and cover letter preferences
-            with open('system_instructions.md', 'r', encoding='utf-8') as file:
-                system_instructions = file.read()
+            # Simple system message
+            system_message = f"You are a helpful job application assistant. Job: {job_details['company_name'].iloc[0]} - {job_details['job_title'].iloc[0]}. Description: {job_details['job_description'].iloc[0][:500]}..."
             
-            job_info = f"You are a bubbly helpful hiring assistant discussing the job at {job_details['company_name'].iloc[0]} for the position of {job_details['job_title'].iloc[0]}."
-            job_desc = f"Job Description:\n{job_details['job_description'].iloc[0]}"
-            notes = f"Notes:\n{job_details['notes'].iloc[0]}"
-            resume_info = f"Resume Content:\n{resume_content}" if resume_content else "No resume has been uploaded yet."
-            career_goals_info = f"Career Goals:\n{career_goals}"
-            
-            # Add cover letter preferences if the prompt is about writing a cover letter
-            cover_letter_context = ""
-            if "cover letter" in prompt.lower():
-                cover_letter_context = f"\n\nCover Letter Preferences:\n{cover_letter_preferences}"
-                instruction = "Please write a cover letter following the provided preferences, considering the job requirements, resume content, and career goals. The cover letter should reflect the user's voice and style preferences."
-            else:
-                instruction = "Please provide insights and advice based on the job requirements, resume content, and career goals. Consider how this job aligns with the user's career aspirations."
-            
-            system_message = f"{system_instructions}\n\n{job_info}\n\n{job_desc}\n\n{resume_info}\n\n{notes}\n\n{career_goals_info}\n\n{cover_letter_context}\n\n{instruction}"
-            
-            # Generate AI response using OpenAI API
+            # Generate response
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -221,7 +286,7 @@ def show_ai_chatbot():
             )
             
             assistant_response = response.choices[0].message.content
-            st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+            st.session_state.basic_messages.append({"role": "assistant", "content": assistant_response})
             with st.chat_message("assistant"):
                 st.markdown(assistant_response)
     else:

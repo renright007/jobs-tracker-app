@@ -5,6 +5,10 @@ plotly==5.19.0
 
 # 🤖 AI/ML Dependencies  
 openai==1.12.0
+langchain==0.2.16
+langchain-openai==0.1.23
+langchain-community==0.2.16
+duckduckgo-search==5.3.0
 
 # 🎨 UI/UX Components
 streamlit-option-menu==0.3.12
