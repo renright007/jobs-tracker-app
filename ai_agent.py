@@ -10,6 +10,7 @@ This module implements a sophisticated AI agent using LangChain that can:
 """
 
 import streamlit as st
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
@@ -20,6 +21,18 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+
+# LangSmith imports
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    # Create a no-op decorator if LangSmith is not available
+    def traceable(func=None, **kwargs):
+        if func is None:
+            return lambda f: f
+        return func
 
 from agent_tools import get_available_tools
 from utils import get_db_connection
@@ -41,6 +54,10 @@ class JobApplicationAgent:
     def _setup_agent(self):
         """Set up the LangChain agent with tools and memory."""
         try:
+            # Configure LangSmith tracing if available
+            if LANGSMITH_AVAILABLE:
+                self._configure_langsmith()
+            
             # Initialize the language model
             llm = ChatOpenAI(
                 model="gpt-4",
@@ -84,6 +101,35 @@ class JobApplicationAgent:
         except Exception as e:
             st.error(f"Error setting up AI agent: {str(e)}")
             self.agent_executor = None
+    
+    def _configure_langsmith(self):
+        """Configure LangSmith tracing environment."""
+        try:
+            # Set LangSmith environment variables
+            if hasattr(st, 'secrets') and st.secrets:
+                os.environ['LANGSMITH_API_KEY'] = st.secrets.get('LANGSMITH_API_KEY', '')
+                os.environ['LANGSMITH_TRACING'] = st.secrets.get('LANGSMITH_TRACING', 'true')
+                os.environ['LANGSMITH_PROJECT'] = st.secrets.get('LANGSMITH_PROJECT', 'my_recruiter_agent')
+            else:
+                # Fallback to existing environment variables
+                os.environ['LANGSMITH_TRACING'] = os.getenv('LANGSMITH_TRACING', 'true')
+                os.environ['LANGSMITH_PROJECT'] = os.getenv('LANGSMITH_PROJECT', 'my_recruiter_agent')
+            
+            # Set additional metadata
+            if self.user_id:
+                os.environ['LANGSMITH_TAGS'] = f"user_id:{self.user_id}"
+                
+        except Exception as e:
+            st.warning(f"LangSmith configuration warning: {str(e)}")
+    
+    def get_tracing_status(self) -> Dict[str, Any]:
+        """Get current LangSmith tracing status."""
+        return {
+            'langsmith_available': LANGSMITH_AVAILABLE,
+            'tracing_enabled': os.getenv('LANGSMITH_TRACING', '').lower() == 'true',
+            'project_name': os.getenv('LANGSMITH_PROJECT', ''),
+            'api_key_configured': bool(os.getenv('LANGSMITH_API_KEY', ''))
+        }
     
     def _create_system_prompt(self) -> str:
         """Create a comprehensive system prompt for the job application agent."""
@@ -177,6 +223,7 @@ Remember: You're not just answering questions - you're helping Robert succeed in
         except FileNotFoundError:
             return "System instructions not found."
     
+    @traceable(name="job_agent_chat", metadata={"agent_type": "job_application_assistant"})
     def chat(self, message: str) -> str:
         """Process a chat message and return the agent's response."""
         if not self.agent_executor:
@@ -200,6 +247,7 @@ Remember: You're not just answering questions - you're helping Robert succeed in
         except Exception as e:
             return f"I encountered an error: {str(e)}. Please try rephrasing your request or check if all required information is available."
     
+    @traceable(name="get_user_context")
     def _get_user_context(self) -> str:
         """Get relevant user context from the database."""
         try:

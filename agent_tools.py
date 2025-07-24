@@ -22,6 +22,18 @@ from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from PyPDF2 import PdfReader
 from docx import Document
 
+# LangSmith imports
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    # Create a no-op decorator if LangSmith is not available
+    def traceable(func=None, **kwargs):
+        if func is None:
+            return lambda f: f
+        return func
+
 from utils import get_db_connection
 
 
@@ -60,6 +72,7 @@ class JobAnalysisTool(BaseTool):
         super().__init__()
         self.user_id = user_id
     
+    @traceable(name="analyze_job", metadata={"tool": "job_analyzer"})
     def _run(self, job_id: int) -> str:
         """Analyze a job posting and return key insights."""
         try:
@@ -181,6 +194,7 @@ class ResumeOptimizerTool(BaseTool):
     description = "Optimize resume content to better match a specific job description"
     args_schema = ResumeOptimizerInput
     
+    @traceable(name="optimize_resume", metadata={"tool": "resume_optimizer"})
     def _run(self, job_description: str, current_resume_text: str) -> str:
         """Optimize resume for the given job description."""
         try:
@@ -265,6 +279,7 @@ class CoverLetterGeneratorTool(BaseTool):
     description = "Generate a personalized cover letter based on job details and user preferences"
     args_schema = CoverLetterInput
     
+    @traceable(name="generate_cover_letter", metadata={"tool": "cover_letter_generator"})
     def _run(self, job_id: int, company_name: str, job_title: str, job_description: str) -> str:
         """Generate a cover letter for the specified job."""
         try:
@@ -366,6 +381,7 @@ class CompanyResearchTool(BaseTool):
         super().__init__()
         self.search = DuckDuckGoSearchAPIWrapper()
     
+    @traceable(name="research_company", metadata={"tool": "company_researcher"})
     def _run(self, company_name: str) -> str:
         """Research the company and return relevant information."""
         try:
@@ -422,6 +438,7 @@ class JobMatchingTool(BaseTool):
         super().__init__()
         self.user_id = user_id
     
+    @traceable(name="analyze_job_match", metadata={"tool": "job_matcher"})
     def _run(self, job_id: int) -> str:
         """Analyze job match and provide compatibility score."""
         try:

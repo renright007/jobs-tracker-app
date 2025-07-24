@@ -154,6 +154,16 @@ def show_ai_chatbot():
     
     agent = st.session_state.job_agent
     
+    # Display tracing status
+    if hasattr(agent, 'get_tracing_status'):
+        tracing_status = agent.get_tracing_status()
+        if tracing_status['tracing_enabled'] and tracing_status['langsmith_available']:
+            st.success(f"🔍 **LangSmith Tracing Active** - Project: `{tracing_status['project_name']}`")
+        elif tracing_status['langsmith_available']:
+            st.info("🔍 **LangSmith Available** - Tracing disabled")
+        else:
+            st.warning("⚠️ **LangSmith Unavailable** - Install langsmith package for tracing")
+    
     # Create two columns for layout
     col1, col2 = st.columns([2, 1])
     
