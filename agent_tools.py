@@ -17,7 +17,7 @@ from datetime import datetime
 import re
 
 from langchain.tools import BaseTool
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from PyPDF2 import PdfReader
 from docx import Document
@@ -64,12 +64,13 @@ class CompanyResearchInput(BaseModel):
 class JobAnalysisTool(BaseTool):
     """Tool to analyze job postings from the database."""
     
-    name = "job_analyzer"
-    description = "Analyze a specific job posting from the database to extract key requirements, skills, and insights"
-    args_schema = JobAnalysisInput
+    name: str = "job_analyzer"
+    description: str = "Analyze a specific job posting from the database to extract key requirements, skills, and insights"
+    args_schema: type[BaseModel] = JobAnalysisInput
+    user_id: Optional[int] = None
     
-    def __init__(self, user_id: Optional[int] = None):
-        super().__init__()
+    def __init__(self, user_id: Optional[int] = None, **kwargs):
+        super().__init__(**kwargs)
         self.user_id = user_id
     
     @traceable(name="analyze_job", metadata={"tool": "job_analyzer"})
@@ -190,9 +191,9 @@ class JobAnalysisTool(BaseTool):
 class ResumeOptimizerTool(BaseTool):
     """Tool to optimize resume content for specific job descriptions."""
     
-    name = "resume_optimizer"
-    description = "Optimize resume content to better match a specific job description"
-    args_schema = ResumeOptimizerInput
+    name: str = "resume_optimizer"
+    description: str = "Optimize resume content to better match a specific job description"
+    args_schema: type[BaseModel] = ResumeOptimizerInput
     
     @traceable(name="optimize_resume", metadata={"tool": "resume_optimizer"})
     def _run(self, job_description: str, current_resume_text: str) -> str:
@@ -275,9 +276,9 @@ class ResumeOptimizerTool(BaseTool):
 class CoverLetterGeneratorTool(BaseTool):
     """Tool to generate personalized cover letters."""
     
-    name = "cover_letter_generator"
-    description = "Generate a personalized cover letter based on job details and user preferences"
-    args_schema = CoverLetterInput
+    name: str = "cover_letter_generator"
+    description: str = "Generate a personalized cover letter based on job details and user preferences"
+    args_schema: type[BaseModel] = CoverLetterInput
     
     @traceable(name="generate_cover_letter", metadata={"tool": "cover_letter_generator"})
     def _run(self, job_id: int, company_name: str, job_title: str, job_description: str) -> str:
@@ -373,13 +374,20 @@ Robert Enright
 class CompanyResearchTool(BaseTool):
     """Tool to research companies using web search."""
     
-    name = "company_researcher"
-    description = "Research a company using web search to gather relevant information for job applications"
-    args_schema = CompanyResearchInput
+    name: str = "company_researcher"
+    description: str = "Research a company using web search to gather relevant information for job applications"
+    args_schema: type[BaseModel] = CompanyResearchInput
     
-    def __init__(self):
-        super().__init__()
-        self.search = DuckDuckGoSearchAPIWrapper()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Initialize search wrapper when needed to avoid Pydantic field issues
+        self._search = None
+    
+    @property
+    def search(self):
+        if self._search is None:
+            self._search = DuckDuckGoSearchAPIWrapper()
+        return self._search
     
     @traceable(name="research_company", metadata={"tool": "company_researcher"})
     def _run(self, company_name: str) -> str:
@@ -430,12 +438,13 @@ Based on the search results above, consider highlighting these points in your ap
 class JobMatchingTool(BaseTool):
     """Tool to analyze how well a user matches a job posting."""
     
-    name = "job_matcher"
-    description = "Analyze how well user qualifications match a specific job posting"
-    args_schema = JobAnalysisInput
+    name: str = "job_matcher"
+    description: str = "Analyze how well user qualifications match a specific job posting"
+    args_schema: type[BaseModel] = JobAnalysisInput
+    user_id: Optional[int] = None
     
-    def __init__(self, user_id: Optional[int] = None):
-        super().__init__()
+    def __init__(self, user_id: Optional[int] = None, **kwargs):
+        super().__init__(**kwargs)
         self.user_id = user_id
     
     @traceable(name="analyze_job_match", metadata={"tool": "job_matcher"})
