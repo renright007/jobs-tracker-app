@@ -117,8 +117,10 @@ def init_db():
     # Create documents table
     c.execute('''CREATE TABLE IF NOT EXISTS documents
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
                   document_name TEXT,
                   document_type TEXT,
+                  document_content TEXT,
                   upload_date TEXT,
                   file_path TEXT)''')
     

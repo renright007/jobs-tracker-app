@@ -5,11 +5,6 @@ plotly==5.19.0
 
 # 🤖 AI/ML Dependencies  
 openai>=1.40.0
-langchain==0.2.16
-langchain-openai==0.1.23
-langchain-community==0.2.16
-langsmith==0.1.147
-duckduckgo-search==5.3.0
 
 # 🎨 UI/UX Components
 streamlit-option-menu==0.3.12
@@ -31,8 +26,7 @@ sqlalchemy==2.0.27
 # 🛠️ Utilities
 python-dotenv==1.0.1
 
-# ❌ REMOVED FOR CLOUD DEPLOYMENT:
-# selenium==4.18.1 (requires browser automation, not cloud compatible)
-# webdriver-manager==4.0.1 (selenium dependency)
-# watchdog==6.0.0 (file system watching, not needed for web app)
+# 🌐 Web Scraping (Disabled for cloud deployment)
+# selenium==4.18.1
+# webdriver-manager==4.0.1
 

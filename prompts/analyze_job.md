@@ -1,0 +1,1 @@
+Please analyze job ID {job_id} and tell me what I should know about this position in relation to the resume and career aspirations for {user_id}.
