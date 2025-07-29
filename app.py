@@ -19,8 +19,7 @@ from utils import (
     init_db,
     ensure_directories,
     get_custom_css,
-    get_menu_style,
-    check_langchain_status
+    get_menu_style
 )
 from streamlit_echarts import st_echarts
 from dashboard_utils import prepare_dashboard_data, show_metrics

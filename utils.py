@@ -5,13 +5,8 @@ import openai
 from datetime import datetime
 import os
 
-# LangChain imports
-try:
-    from langchain_openai import ChatOpenAI
-    from langchain.agents import AgentExecutor
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
+# LangChain imports (disabled for OpenAI implementation)
+LANGCHAIN_AVAILABLE = False
 
 def read_secrets():
     """Read secrets from Streamlit secrets or environment variables."""
