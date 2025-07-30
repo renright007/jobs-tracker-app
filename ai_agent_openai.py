@@ -158,31 +158,48 @@ class OpenAIJobAgent:
             return None
     
     def _get_user_resume(self) -> str:
-        """Get user's latest resume content."""
+        """Get user's preferred resume content, falling back to latest if none selected."""
         try:
             conn = get_db_connection()
+            
             if self.user_id:
+                # First try to get the user's preferred resume using the preferred_resume column
                 resume_df = pd.read_sql_query(
-                    "SELECT file_path, document_content FROM documents WHERE user_id = ? AND document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                    "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' AND preferred_resume = 1 LIMIT 1",
                     conn, params=(self.user_id,)
                 )
+                
+                # If no preferred resume, fall back to latest resume
+                if resume_df.empty:
+                    resume_df = pd.read_sql_query(
+                        "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                        conn, params=(self.user_id,)
+                    )
             else:
+                # For non-authenticated users, get latest resume
                 resume_df = pd.read_sql_query(
-                    "SELECT file_path, document_content FROM documents WHERE document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                    "SELECT file_path, document_content, document_name FROM documents WHERE document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
                     conn
                 )
+            
             conn.close()
             
             if not resume_df.empty:
+                # Get document name for reference
+                doc_name = resume_df['document_name'].iloc[0] if pd.notna(resume_df['document_name'].iloc[0]) else "Unknown"
+                
+                # Try to get content from database first
                 content = resume_df['document_content'].iloc[0]
                 if content and pd.notna(content):
-                    return str(content)
+                    return f"[Using resume: {doc_name}]\n\n{str(content)}"
                 else:
+                    # Fall back to extracting from file
                     file_path = resume_df['file_path'].iloc[0]
                     if pd.notna(file_path):
-                        return self._extract_text_from_file(file_path)
+                        extracted_content = self._extract_text_from_file(file_path)
+                        return f"[Using resume: {doc_name}]\n\n{extracted_content}"
             
-            return "No resume found. Please upload a resume in the User Portal."
+            return "No resume found. Please upload a resume in the Document Portal and set it as your preferred resume."
         except Exception as e:
             return f"Error loading resume: {str(e)}"
     
@@ -567,8 +584,20 @@ Since direct web search isn't implemented in this simplified version, here's a s
         
         system_prompt = f"""You are an expert recruitment assistant specializing in helping users find employment. 
 
+## Agent Purpose
+
+You are a dedicated AI Job Application Assistant designed to provide comprehensive support throughout the entire job search and application process. Your primary mission is to:
+
+- **Empower job seekers** with data-driven insights and personalized guidance
+- **Streamline the application process** by automating analysis and content generation
+- **Increase application success rates** through strategic optimization and research
+- **Provide expert-level career advice** backed by industry best practices
+- **Maintain a supportive, professional approach** that builds user confidence
+
+You excel at breaking down complex job requirements, identifying key opportunities for improvement, and providing actionable recommendations that directly impact application success. Every interaction should leave the user better prepared and more confident in their job search journey.
+
 ## User Context
-**Resume:** {resume[:500]}...
+**Resume:** {resume}...
 
 **Career Context:** You're helping a job seeker optimize their applications, analyze opportunities, and provide strategic career guidance.
 

@@ -46,6 +46,7 @@ def init_db():
                       document_type TEXT,
                       upload_date TEXT,
                       file_path TEXT,
+                      preferred_resume INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         
         # Create user_profile table with user relationship
@@ -222,6 +223,89 @@ def add_career_goals(user_id, goals):
     finally:
         conn.close()
 
+def save_documents_to_database(user_id, documents_df):
+    """Save changes from the documents DataFrame back to the database with preferred resume validation."""
+    conn = get_db_connection()
+    try:
+        c = conn.cursor()
+        
+        # Business rule: Only one preferred resume per user
+        preferred_count = len(documents_df[documents_df['preferred_resume'] == True])
+        if preferred_count > 1:
+            return False, "Only one document can be set as preferred resume per user"
+        
+        # Update each document
+        for _, row in documents_df.iterrows():
+            # Ensure the document belongs to the current user
+            c.execute('SELECT user_id FROM documents WHERE id = ?', (row['id'],))
+            result = c.fetchone()
+            if not result or result[0] != user_id:
+                continue  # Skip documents that don't belong to this user
+            
+            # Convert boolean to integer for SQLite
+            preferred_value = 1 if row['preferred_resume'] else 0
+            
+            # Update the document
+            c.execute('''UPDATE documents 
+                        SET preferred_resume = ?
+                        WHERE id = ? AND user_id = ?''',
+                     (preferred_value, row['id'], user_id))
+        
+        conn.commit()
+        return True, "Documents updated successfully!"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error saving documents: {str(e)}"
+    finally:
+        conn.close()
+
+def get_preferred_resume(user_id):
+    """Get the user's preferred resume document."""
+    conn = get_db_connection()
+    try:
+        query = '''SELECT * FROM documents 
+                  WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'
+                  LIMIT 1'''
+        result = pd.read_sql_query(query, conn, params=(user_id,))
+        return result if not result.empty else None
+    finally:
+        conn.close()
+
+def delete_document(user_id, document_id):
+    """Delete a document for a user (both from database and file system)."""
+    import os
+    conn = get_db_connection()
+    try:
+        c = conn.cursor()
+        
+        # First get the document info to ensure it belongs to the user and get file path
+        c.execute('SELECT file_path FROM documents WHERE id = ? AND user_id = ?', (document_id, user_id))
+        document = c.fetchone()
+        
+        if not document:
+            return False, "Document not found or access denied"
+        
+        file_path = document[0]
+        
+        # Delete from database
+        c.execute('DELETE FROM documents WHERE id = ? AND user_id = ?', (document_id, user_id))
+        
+        # Delete physical file if it exists
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError as e:
+                # Log the error but don't fail the database operation
+                print(f"Warning: Could not delete file {file_path}: {e}")
+        
+        conn.commit()
+        return True, "Document deleted successfully!"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Error deleting document: {str(e)}"
+    finally:
+        conn.close()
+
 def get_user_stats(user_id):
     """Get statistics for a user's job applications."""
     conn = get_db_connection()
@@ -254,7 +338,7 @@ def get_user_stats(user_id):
         conn.close()
 
 def migrate_existing_data():
-    """Migrate existing data to include user relationships."""
+    """Migrate existing data to include user relationships and preferred_resume column."""
     conn = get_db_connection()
     try:
         c = conn.cursor()
@@ -270,6 +354,12 @@ def migrate_existing_data():
             c.execute('ALTER TABLE documents ADD COLUMN user_id INTEGER REFERENCES users(id)')
         except sqlite3.OperationalError:
             pass
+        
+        # Add preferred_resume column to documents if it doesn't exist
+        try:
+            c.execute('ALTER TABLE documents ADD COLUMN preferred_resume INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         # Add user_id column to user_profile if it doesn't exist
         try:
