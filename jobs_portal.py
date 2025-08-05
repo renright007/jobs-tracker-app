@@ -140,7 +140,7 @@ def show_jobs_portal():
             salary = st.text_input("Salary")
             job_listing_type = st.selectbox(
                 "Job Listing Type",
-                ["Company Listing", "Indeed", "LinkedIn", "Recruiter"]
+                ["Company Listing", "Indeed", "LinkedIn", "Recruiter", "Upwork"]
             )
             status = st.selectbox("Application Status", 
                                 ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected"])
@@ -185,7 +185,7 @@ def show_jobs_portal():
             job_url = st.text_input("Job URL")
             listing_type = st.selectbox(
                 "Listing Type",
-                ["Company Listing", "Indeed", "LinkedIn", "Recruiter"]
+                ["Company Listing", "Indeed", "LinkedIn", "Recruiter", "Upwork"]
             )
             application_status = st.selectbox(
                 "Application Status",
