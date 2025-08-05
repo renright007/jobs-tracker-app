@@ -24,6 +24,9 @@ beautifulsoup4==4.12.3
 # 🛠️ Utilities
 python-dotenv==1.0.1
 
+# 🗄️ Database - Supabase (Cloud PostgreSQL)
+supabase==2.3.4
+
 # 🌐 Web Scraping (Disabled for cloud deployment)
 # selenium==4.18.1
 # webdriver-manager==4.0.1
