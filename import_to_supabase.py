@@ -96,6 +96,37 @@ def verify_import():
         except Exception as e:
             print(f"  ❌ {table}: Error - {str(e)}")
 
+def check_existing_data():
+    """Check if tables already contain data before import."""
+    supabase = get_supabase_client()
+    
+    print("🔍 Checking existing data in Supabase...")
+    
+    tables = ['users', 'jobs', 'documents', 'user_profile', 'career_goals']
+    has_data = False
+    
+    for table in tables:
+        try:
+            result = supabase.table(table).select('id', count='exact').execute()
+            count = result.count
+            if count > 0:
+                print(f"  ⚠️ {table}: {count} existing records")
+                has_data = True
+            else:
+                print(f"  ✅ {table}: empty")
+        except Exception as e:
+            print(f"  ❓ {table}: {str(e)}")
+    
+    if has_data:
+        print("\n⚠️ WARNING: Existing data found in Supabase tables!")
+        print("   Import will ADD to existing data, not replace it.")
+        print("   Consider cleaning tables first if you want fresh import.")
+        
+        response = input("\n❓ Continue with import anyway? (y/N): ").lower().strip()
+        return response in ['y', 'yes']
+    
+    return True
+
 def main():
     # Find the most recent export file
     export_files = [f for f in os.listdir('.') if f.startswith('sqlite_export_') and f.endswith('.json')]
@@ -107,6 +138,11 @@ def main():
     # Use the most recent export
     export_file = sorted(export_files)[-1]
     print(f"📁 Using export file: {export_file}")
+    
+    # Check for existing data
+    if not check_existing_data():
+        print("❌ Import cancelled by user.")
+        return
     
     # Import data
     success = import_data_to_supabase(export_file)
