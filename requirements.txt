@@ -16,12 +16,7 @@ PyPDF2==3.0.1
 python-docx==1.1.0
 
 # 🌐 Web/HTTP
-httpx==0.27.2
 beautifulsoup4==4.12.3
-
-# 🗄️ Database (for future Supabase migration)
-supabase==2.3.4
-sqlalchemy==2.0.27
 
 # 🛠️ Utilities
 python-dotenv==1.0.1

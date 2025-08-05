@@ -12,9 +12,7 @@ pip install -r requirements.txt
 2. Create a `secrets.json` file with your API keys:
 ```json
 {
-    "OPENAI_API_KEY": "your_openai_api_key",
-    "SUPABASE_URL": "your_supabase_url",
-    "SUPABASE_API_KEY": "your_supabase_api_key"
+    "OPENAI_API_KEY": "your_openai_api_key"
 }
 ```
 
@@ -39,20 +37,16 @@ streamlit run app.py
 
 5. Add your secrets in the Streamlit Cloud dashboard:
    - Go to your app's settings
-   - Add the following secrets:
+   - Add the following secret:
      - `OPENAI_API_KEY`
-     - `SUPABASE_URL`
-     - `SUPABASE_API_KEY`
 
 6. Deploy your app
 
 ### Environment Variables
 
-The following environment variables need to be set in your deployment environment:
+The following environment variable needs to be set in your deployment environment:
 
 - `OPENAI_API_KEY`: Your OpenAI API key
-- `SUPABASE_URL`: Your Supabase project URL
-- `SUPABASE_API_KEY`: Your Supabase API key
 
 ## Features
 
