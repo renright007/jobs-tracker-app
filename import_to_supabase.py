@@ -15,7 +15,7 @@ def get_supabase_client():
     return create_client(supabase_url, supabase_key)
 
 def import_data_to_supabase(export_file):
-    """Import data from SQLite export to Supabase."""
+    """Import data from SQLite export to Supabase with foreign key mapping."""
     
     if not os.path.exists(export_file):
         print(f"❌ Export file not found: {export_file}")
@@ -27,6 +27,9 @@ def import_data_to_supabase(export_file):
     
     supabase = get_supabase_client()
     print("🚀 Importing data to Supabase...")
+    
+    # Track ID mappings for foreign keys
+    id_mappings = {}
     
     # Import order matters due to foreign key constraints
     import_order = ['users', 'jobs', 'documents', 'user_profile', 'career_goals']
@@ -54,21 +57,48 @@ def import_data_to_supabase(export_file):
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
                 
-                # Clean records for PostgreSQL
+                # Clean records for PostgreSQL and handle foreign keys
                 cleaned_batch = []
                 for record in batch:
                     cleaned_record = {}
+                    old_id = record.get('id')  # Store original ID for mapping
+                    
                     for key, value in record.items():
                         # Skip SQLite auto-increment IDs - let PostgreSQL generate new ones
                         if key == 'id':
                             continue
-                        # Handle None values
-                        cleaned_record[key] = value
+                        
+                        # Handle foreign key references
+                        if key == 'user_id' and table_name != 'users':
+                            # Map old user_id to new user_id
+                            if value in id_mappings.get('users', {}):
+                                cleaned_record[key] = id_mappings['users'][value]
+                            else:
+                                print(f"⚠️ Warning: user_id {value} not found in mapping")
+                                cleaned_record[key] = value  # Keep original, might fail
+                        else:
+                            cleaned_record[key] = value
+                    
                     cleaned_batch.append(cleaned_record)
                 
-                # Insert batch
+                # Insert batch and track new IDs for users table
                 if cleaned_batch:
                     result = supabase.table(table_name).insert(cleaned_batch).execute()
+                    inserted_records = result.data
+                    
+                    # For users table, create ID mapping
+                    if table_name == 'users':
+                        if table_name not in id_mappings:
+                            id_mappings[table_name] = {}
+                        
+                        # Map old SQLite IDs to new PostgreSQL IDs
+                        for j, new_record in enumerate(inserted_records):
+                            original_record = batch[i + j]
+                            old_id = original_record['id']
+                            new_id = new_record['id']
+                            id_mappings[table_name][old_id] = new_id
+                            print(f"    📝 ID mapping: {old_id} → {new_id}")
+                    
                     print(f"  ✅ Batch {i//batch_size + 1}: {len(cleaned_batch)} records inserted")
             
             print(f"✅ Successfully imported {len(records)} records to {table_name}")
