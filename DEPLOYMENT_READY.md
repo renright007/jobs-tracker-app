@@ -48,11 +48,15 @@ SUPABASE_DB_PW = "your_db_password"
 
 ### ✅ Working Features:
 - 🔐 **User Authentication** - Login/registration system
-- 📊 **Job Tracking** - Add, edit, manage job applications  
-- 🤖 **AI Assistant** - OpenAI-powered job application help
+- 📊 **Job Tracking** - Add, edit, manage job applications (including Upwork!)
+- 🤖 **AI Assistant** - OpenAI-powered job application help with GPT-4
 - 📈 **Analytics Dashboard** - Application progress tracking
 - 🎯 **Career Goals** - Goal setting and tracking
 - 💼 **Quick Actions** - Analyze jobs, optimize resumes, generate cover letters
+- 🏢 **AI Company Research** - Comprehensive company analysis with 7 key insights
+- 📄 **Document Management** - Upload, manage, and delete resumes/cover letters
+- ⭐ **Preferred Resume** - Set default resume for AI features
+- 📋 **Editable Tables** - Manage documents with checkbox-based selections
 
 ### 🚧 Temporarily Disabled (Cloud Limitations):
 - 📁 File uploads (local storage not cloud-compatible)

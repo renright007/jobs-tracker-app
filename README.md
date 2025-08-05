@@ -56,12 +56,15 @@ The following environment variables need to be set in your deployment environmen
 
 ## Features
 
-- Job application tracking
-- Document management
-- AI-powered job assistant
-- Career goals tracking
-- Interactive dashboard
-- User profile management
+- 🔐 **User Authentication** - Secure login/registration system
+- 📊 **Job Application Tracking** - Comprehensive job management (including Upwork, LinkedIn, Indeed)
+- 📄 **Document Management** - Upload, organize, and delete resumes/cover letters with preferred resume selection
+- 🤖 **AI-Powered Job Assistant** - GPT-4 powered career guidance and application help
+- 🏢 **AI Company Research** - Automated company analysis with 7 key insight areas
+- 🎯 **Career Goals Tracking** - Set and monitor career objectives
+- 📈 **Interactive Dashboard** - Visual analytics of application progress
+- 👤 **User Profile Management** - Centralized profile and document management
+- 💼 **Quick Actions** - One-click job analysis, resume optimization, and cover letter generation
 
 ## Project Structure
 
