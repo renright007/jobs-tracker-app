@@ -86,71 +86,45 @@ def check_langchain_status():
     }
 
 def get_db_connection():
-    """Get SQLite database connection."""
-    return sqlite3.connect('data/jobs.db')
+    """Get database connection - DEPRECATED: Use database_utils functions instead."""
+    # This function is deprecated and maintained only for backwards compatibility
+    # New code should use database_utils.py functions which support both SQLite and Supabase
+    from database_utils import use_supabase
+    
+    if use_supabase():
+        # For Supabase, this function shouldn't be used - use database_utils functions
+        import streamlit as st
+        st.warning("⚠️ Using deprecated get_db_connection() with Supabase. Please use database_utils functions.")
+        return None
+    else:
+        # For SQLite compatibility
+        return sqlite3.connect('data/jobs.db')
 
 def init_db():
-    """Initialize the SQLite database with the required tables."""
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    # Create jobs table
-    c.execute('''CREATE TABLE IF NOT EXISTS jobs
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  company_name TEXT,
-                  job_title TEXT,
-                  job_description TEXT,
-                  application_url TEXT,
-                  status TEXT,
-                  sentiment TEXT,
-                  notes TEXT,
-                  date_added TEXT,
-                  location TEXT,
-                  salary TEXT,
-                  applied_date TEXT)''')
-    
-    # Create documents table
-    c.execute('''CREATE TABLE IF NOT EXISTS documents
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  document_name TEXT,
-                  document_type TEXT,
-                  document_content TEXT,
-                  upload_date TEXT,
-                  file_path TEXT)''')
-    
-    # Create user_profile table
-    c.execute('''CREATE TABLE IF NOT EXISTS user_profile
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  selected_resume TEXT,
-                  created_date TEXT,
-                  last_updated_date TEXT)''')
-    
-    # Create career_goals table
-    c.execute('''CREATE TABLE IF NOT EXISTS career_goals
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  goals TEXT,
-                  submission_date TEXT)''')
-    
-    conn.commit()
-    conn.close()
+    """Initialize the database with the required tables - DEPRECATED: Use database_utils.init_db() instead."""
+    # This function is deprecated - use database_utils.init_db() for unified database support
+    from database_utils import init_db as db_utils_init_db
+    return db_utils_init_db()
 
 def update_db_schema(query=None):
-    """Update the database schema with new fields.
+    """Update the database schema with new fields - DEPRECATED."""
+    # This function is deprecated and may not work with Supabase
+    from database_utils import use_supabase
+    if use_supabase():
+        st.warning("⚠️ update_db_schema() is deprecated and doesn't support Supabase. Use Supabase dashboard for schema changes.")
+        return
     
-    Args:
-        query (str, optional): SQL query to execute. If None, will add default columns.
-    """
     conn = get_db_connection()
+    if not conn:  # Supabase case
+        return
+        
     c = conn.cursor()
-    
     try:
         c.execute(query)
         conn.commit()
     except Exception as e:
         st.error(f"Error executing schema update: {str(e)}")
         conn.rollback()
-
     conn.close()
 
 # Call update_db_schema when initializing
@@ -163,23 +137,32 @@ def ensure_directories():
     Path("assets").mkdir(exist_ok=True)
 
 def save_uploaded_file(uploaded_file, document_name, document_type, user_id):
-    """Save uploaded file and add to database."""
+    """Save uploaded file and add to database - DEPRECATED: Use user_portal.py functions instead."""
+    # This function is deprecated - use database_utils.add_document() for unified database support
+    from database_utils import add_document, use_supabase
+    
     # Generate file path
     file_path = f"data/documents/{document_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
     
-    # Save file
+    # Save file (Note: This won't work in cloud environments - needs cloud storage)
+    if use_supabase():
+        st.warning("⚠️ File uploads don't work with cloud storage. This function is deprecated for Supabase.")
+        return None
+    
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     
-    # Add to database with user_id
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''INSERT INTO documents 
-                (document_name, document_type, upload_date, file_path, user_id)
-                VALUES (?, ?, ?, ?, ?)''',
-             (document_name, document_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), file_path, user_id))
-    conn.commit()
-    conn.close()
+    # Add to database using unified function
+    document_data = {
+        'document_name': document_name,
+        'document_type': document_type,
+        'file_path': file_path
+    }
+    success, message = add_document(user_id, document_data)
+    
+    if not success:
+        st.error(f"Error adding document to database: {message}")
+        return None
     
     return file_path
 

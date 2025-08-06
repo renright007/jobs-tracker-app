@@ -14,27 +14,9 @@ import time
 
 def init_auth_db():
     """Initialize the authentication database."""
-    # Ensure data directory exists
-    os.makedirs('data', exist_ok=True)
-    
-    conn = sqlite3.connect('data/jobs.db')
-    c = conn.cursor()
-    
-    try:
-        # Create users table if it doesn't exist
-        c.execute('''CREATE TABLE IF NOT EXISTS users
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      username TEXT UNIQUE NOT NULL,
-                      password_hash TEXT NOT NULL,
-                      email TEXT UNIQUE,
-                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-        
-        conn.commit()
-        # Database initialized silently - no need for user notification
-    except Exception as e:
-        st.error(f"Error initializing database: {str(e)}")
-    finally:
-        conn.close()
+    # Use the unified database initialization
+    from database_utils import init_db
+    return init_db()
 
 def save_users_to_database(users_df):
     """Save changes from the DataFrame back to the database."""
@@ -90,95 +72,172 @@ def hash_password(password):
 
 def check_email_exists(email):
     """Check if an email exists in the database."""
-    conn = sqlite3.connect('data/jobs.db')
-    c = conn.cursor()
+    from database_utils import use_supabase
     
-    try:
-        c.execute('SELECT id FROM users WHERE email = ?', (email,))
-        result = c.fetchone()
-        return result is not None
-    finally:
-        conn.close()
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        try:
+            supabase = get_supabase_client()
+            result = supabase.table('users').select('id').eq('email', email).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error checking email: {str(e)}")
+            return False
+    else:
+        # SQLite fallback
+        conn = get_db_connection()
+        if not conn:
+            return False
+        c = conn.cursor()
+        try:
+            c.execute('SELECT id FROM users WHERE email = ?', (email,))
+            result = c.fetchone()
+            return result is not None
+        finally:
+            conn.close()
 
 def register_user(username, password, email=None):
-    """Register a new user."""
-    st.write("Starting registration process...")  # Debug log
+    """Register a new user using unified database system."""
+    from database_utils import use_supabase
     
-    # Ensure data directory exists
-    os.makedirs('data', exist_ok=True)
+    # Validate input
+    if not username or not password:
+        st.error("Username and password are required.")
+        return False, "Username and password are required."
     
-    conn = sqlite3.connect('data/jobs.db')
-    c = conn.cursor()
+    # Hash the password
+    password_hash = hash_password(password)
     
-    try:
-        # Validate input
-        if not username or not password:
-            st.error("Username and password are required.")
-            return False, "Username and password are required."
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        try:
+            supabase = get_supabase_client()
+            
+            # Check if username already exists
+            username_check = supabase.table('users').select('id').eq('username', username).execute()
+            if username_check.data:
+                st.error("Username already exists.")
+                return False, "Username already exists. Please choose a different username."
+            
+            # Check if email already exists (if provided)
+            if email:
+                email_check = supabase.table('users').select('id').eq('email', email).execute()
+                if email_check.data:
+                    st.error("Email already registered.")
+                    return False, "Email already registered. Please use a different email."
+            
+            # Insert the new user
+            user_data = {
+                'username': username,
+                'password_hash': password_hash,
+                'email': email,
+                'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            result = supabase.table('users').insert(user_data).execute()
+            st.success("User registered successfully!")
+            return True, "Registration successful! You can now login."
+            
+        except Exception as e:
+            st.error(f"Error during registration: {str(e)}")
+            return False, f"Error during registration: {str(e)}"
+    else:
+        # SQLite fallback
+        os.makedirs('data', exist_ok=True)
+        conn = get_db_connection()
+        if not conn:
+            return False, "Database connection failed"
+        c = conn.cursor()
         
-        st.write("Checking for existing username...")  # Debug log
-        # Check if username already exists
-        c.execute('SELECT id FROM users WHERE username = ?', (username,))
-        if c.fetchone():
-            st.error("Username already exists.")
-            return False, "Username already exists. Please choose a different username."
-        
-        # Check if email already exists (if provided)
-        if email:
-            st.write("Checking for existing email...")  # Debug log
-            c.execute('SELECT id FROM users WHERE email = ?', (email,))
+        try:
+            # Check if username already exists
+            c.execute('SELECT id FROM users WHERE username = ?', (username,))
             if c.fetchone():
-                st.error("Email already registered.")
-                return False, "Email already registered. Please use a different email."
-        
-        st.write("Hashing password...")  # Debug log
-        # Hash the password
-        password_hash = hash_password(password)
-        
-        st.write("Inserting new user...")  # Debug log
-        # Insert the new user
-        c.execute('''INSERT INTO users (username, password_hash, email, created_at)
-                     VALUES (?, ?, ?, ?)''', 
-                     (username, password_hash, email, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        
-        conn.commit()
-        st.success("User registered successfully!")
-        return True, "Registration successful! You can now login."
-    except sqlite3.IntegrityError as e:
-        st.error(f"Database error: {str(e)}")
-        return False, f"Database error: {str(e)}"
-    except Exception as e:
-        st.error(f"Error during registration: {str(e)}")
-        return False, f"Error during registration: {str(e)}"
-    finally:
-        conn.close()
+                st.error("Username already exists.")
+                return False, "Username already exists. Please choose a different username."
+            
+            # Check if email already exists (if provided)
+            if email:
+                c.execute('SELECT id FROM users WHERE email = ?', (email,))
+                if c.fetchone():
+                    st.error("Email already registered.")
+                    return False, "Email already registered. Please use a different email."
+            
+            # Insert the new user
+            c.execute('''INSERT INTO users (username, password_hash, email, created_at)
+                         VALUES (?, ?, ?, ?)''', 
+                         (username, password_hash, email, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            
+            conn.commit()
+            st.success("User registered successfully!")
+            return True, "Registration successful! You can now login."
+        except sqlite3.IntegrityError as e:
+            st.error(f"Database error: {str(e)}")
+            return False, f"Database error: {str(e)}"
+        except Exception as e:
+            st.error(f"Error during registration: {str(e)}")
+            return False, f"Error during registration: {str(e)}"
+        finally:
+            conn.close()
 
 def verify_user(username, password):
-    """Verify user credentials and return detailed status."""
-    conn = sqlite3.connect('data/jobs.db')
-    c = conn.cursor()
+    """Verify user credentials and return detailed status using unified database system."""
+    from database_utils import use_supabase
     
-    try:
-        # First check if username exists
-        c.execute('SELECT id, password_hash, email FROM users WHERE username = ?', (username,))
-        result = c.fetchone()
-        
-        if result is None:
-            return False, "username_not_found", None
-        
-        user_id, stored_hash, email = result
-        password_hash = hash_password(password)
-        
-        if password_hash == stored_hash:
-            return True, "success", user_id
-        else:
-            return False, "wrong_password", None
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        try:
+            supabase = get_supabase_client()
             
-    except Exception as e:
-        st.error(f"Error during verification: {str(e)}")
-        return False, "error", None
-    finally:
-        conn.close()
+            # First check if username exists
+            result = supabase.table('users').select('id, password_hash, email').eq('username', username).execute()
+            
+            if not result.data:
+                return False, "username_not_found", None
+            
+            user_data = result.data[0]
+            user_id = user_data['id']
+            stored_hash = user_data['password_hash']
+            email = user_data['email']
+            
+            password_hash = hash_password(password)
+            
+            if password_hash == stored_hash:
+                return True, "success", user_id
+            else:
+                return False, "wrong_password", None
+                
+        except Exception as e:
+            st.error(f"Error during verification: {str(e)}")
+            return False, "error", None
+    else:
+        # SQLite fallback
+        conn = get_db_connection()
+        if not conn:
+            return False, "error", None
+        c = conn.cursor()
+        
+        try:
+            # First check if username exists
+            c.execute('SELECT id, password_hash, email FROM users WHERE username = ?', (username,))
+            result = c.fetchone()
+            
+            if result is None:
+                return False, "username_not_found", None
+            
+            user_id, stored_hash, email = result
+            password_hash = hash_password(password)
+            
+            if password_hash == stored_hash:
+                return True, "success", user_id
+            else:
+                return False, "wrong_password", None
+                
+        except Exception as e:
+            st.error(f"Error during verification: {str(e)}")
+            return False, "error", None
+        finally:
+            conn.close()
 
 def show_main_menu():
     """Display the main menu after successful login."""
@@ -203,19 +262,42 @@ def show_main_menu():
     menu_options[selected_page]()
 
 def get_existing_users():
-    """Get list of existing users from the database."""
-    conn = sqlite3.connect('data/jobs.db')
-    c = conn.cursor()
+    """Get list of existing users from the database using unified database system."""
+    from database_utils import use_supabase
     
-    try:
-        c.execute('SELECT id, username, email, created_at FROM users ORDER BY created_at DESC')
-        users = c.fetchall()
-        # Convert to DataFrame
-        df = pd.DataFrame(users, columns=['id', 'Username', 'Email', 'Registration Date'])
-        df['Registration Date'] = pd.to_datetime(df['Registration Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        return df
-    finally:
-        conn.close()
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        try:
+            supabase = get_supabase_client()
+            result = supabase.table('users').select('id, username, email, created_at').order('created_at', desc=True).execute()
+            
+            if result.data:
+                # Convert to DataFrame
+                df = pd.DataFrame(result.data)
+                df.columns = ['id', 'Username', 'Email', 'Registration Date']
+                df['Registration Date'] = pd.to_datetime(df['Registration Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+                return df
+            else:
+                return pd.DataFrame(columns=['id', 'Username', 'Email', 'Registration Date'])
+        except Exception as e:
+            st.error(f"Error getting users: {str(e)}")
+            return pd.DataFrame(columns=['id', 'Username', 'Email', 'Registration Date'])
+    else:
+        # SQLite fallback
+        conn = get_db_connection()
+        if not conn:
+            return pd.DataFrame(columns=['id', 'Username', 'Email', 'Registration Date'])
+        c = conn.cursor()
+        
+        try:
+            c.execute('SELECT id, username, email, created_at FROM users ORDER BY created_at DESC')
+            users = c.fetchall()
+            # Convert to DataFrame
+            df = pd.DataFrame(users, columns=['id', 'Username', 'Email', 'Registration Date'])
+            df['Registration Date'] = pd.to_datetime(df['Registration Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+            return df
+        finally:
+            conn.close()
 
 def show_login_page():
     """Display the login page."""
