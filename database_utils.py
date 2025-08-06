@@ -28,15 +28,42 @@ def is_cloud_environment():
 def use_supabase():
     """Determine whether to use Supabase or SQLite."""
     # Always prefer Supabase if available (both local and cloud)
-    if SUPABASE_AVAILABLE:
+    if not SUPABASE_AVAILABLE:
+        return False
+    
+    # Check for Supabase credentials in multiple sources
+    has_credentials = False
+    
+    # 1. Check Streamlit secrets (works when running with streamlit run)
+    try:
+        if hasattr(st, 'secrets') and 'SUPABASE_URL' in st.secrets and 'SUPABASE_API_KEY' in st.secrets:
+            supabase_url = st.secrets.get('SUPABASE_URL', '').strip()
+            supabase_key = st.secrets.get('SUPABASE_API_KEY', '').strip()
+            if supabase_url and supabase_key:
+                has_credentials = True
+    except:
+        pass
+    
+    # 2. Check environment variables
+    if not has_credentials:
+        supabase_url = os.getenv('SUPABASE_URL', '').strip()
+        supabase_key = os.getenv('SUPABASE_API_KEY', '').strip()
+        has_credentials = bool(supabase_url and supabase_key)
+    
+    # 3. Check secrets.toml file directly (for local development)
+    if not has_credentials and os.path.exists('.streamlit/secrets.toml'):
         try:
-            # Check if Supabase credentials are available
-            if hasattr(st, 'secrets') and 'SUPABASE_URL' in st.secrets:
-                return True
+            import toml
+            with open('.streamlit/secrets.toml', 'r') as f:
+                secrets = toml.load(f)
+                supabase_url = secrets.get('default', {}).get('SUPABASE_URL', '').strip()
+                supabase_key = secrets.get('default', {}).get('SUPABASE_API_KEY', '').strip()
+                has_credentials = bool(supabase_url and supabase_key)
         except:
+            # toml package not available or file read error
             pass
-    # Fallback to the original cloud detection logic
-    return SUPABASE_AVAILABLE and is_cloud_environment()
+    
+    return has_credentials
 
 def get_database_status():
     """Get current database backend status."""

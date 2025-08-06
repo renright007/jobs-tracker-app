@@ -23,6 +23,7 @@ beautifulsoup4==4.12.3
 
 # 🛠️ Utilities
 python-dotenv==1.0.1
+toml==0.10.2
 
 # 🗄️ Database - Supabase (Cloud PostgreSQL)
 supabase==2.3.4

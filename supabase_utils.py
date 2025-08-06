@@ -11,17 +11,36 @@ import os
 
 def get_supabase_client() -> Client:
     """Get Supabase client connection."""
+    supabase_url = None
+    supabase_key = None
+    
+    # 1. Try to get from Streamlit secrets first (works when running with streamlit run)
     try:
-        # Try to get from Streamlit secrets first (cloud deployment)
-        supabase_url = st.secrets.get("SUPABASE_URL")
-        supabase_key = st.secrets.get("SUPABASE_API_KEY")
+        if hasattr(st, 'secrets') and 'SUPABASE_URL' in st.secrets:
+            supabase_url = st.secrets.get("SUPABASE_URL")
+            supabase_key = st.secrets.get("SUPABASE_API_KEY")
     except:
-        # Fallback to environment variables (local development)
+        pass
+    
+    # 2. Fallback to environment variables
+    if not supabase_url or not supabase_key:
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_API_KEY")
     
+    # 3. Read from secrets.toml file directly (for local development)
+    if (not supabase_url or not supabase_key) and os.path.exists('.streamlit/secrets.toml'):
+        try:
+            import toml
+            with open('.streamlit/secrets.toml', 'r') as f:
+                secrets = toml.load(f)
+                supabase_url = secrets.get('default', {}).get('SUPABASE_URL')
+                supabase_key = secrets.get('default', {}).get('SUPABASE_API_KEY')
+        except:
+            # toml package not available or file read error
+            pass
+    
     if not supabase_url or not supabase_key:
-        raise ValueError("Supabase credentials not found in secrets or environment variables")
+        raise ValueError("Supabase credentials not found in secrets, environment variables, or secrets.toml")
     
     return create_client(supabase_url, supabase_key)
 
