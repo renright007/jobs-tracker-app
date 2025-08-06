@@ -1,13 +1,13 @@
 # 🚀 Core Streamlit App Dependencies
 streamlit==1.32.0
-pandas==2.2.1
-numpy==1.26.4
-pyarrow==15.0.0
+pandas==2.1.4
+numpy==1.24.4
+pyarrow==14.0.2
 tzdata==2024.1
 plotly==5.19.0
 
 # 🤖 AI/ML Dependencies  
-openai==1.40.0
+openai==1.35.0
 
 # 🎨 UI/UX Components
 streamlit-option-menu==0.3.12
