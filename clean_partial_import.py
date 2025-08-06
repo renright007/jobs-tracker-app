@@ -2,12 +2,24 @@
 Clean partially imported data from Supabase before re-running import.
 """
 
+import os
 from supabase import create_client, Client
 
 def get_supabase_client():
     """Get Supabase client connection."""
-    supabase_url = "https://hnjcdsihsocxlmktjfpl.supabase.co"
-    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuamNkc2loc29jeGxta3RqZnBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzODUzNjMsImV4cCI6MjA2Mzk2MTM2M30._BN9eioY59JfVlMhgMSLnm40IwKVkJj5WvnzjMfnJ3c"
+    # Try to get from environment variables first
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_API_KEY")
+    
+    # If not in environment, try Streamlit secrets
+    if not supabase_url or not supabase_key:
+        try:
+            import streamlit as st
+            supabase_url = st.secrets["SUPABASE_URL"]
+            supabase_key = st.secrets["SUPABASE_API_KEY"]
+        except:
+            raise ValueError("❌ Supabase credentials not found. Set SUPABASE_URL and SUPABASE_API_KEY environment variables or run from Streamlit context")
+    
     return create_client(supabase_url, supabase_key)
 
 def clean_partial_import():

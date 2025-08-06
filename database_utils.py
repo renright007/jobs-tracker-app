@@ -27,6 +27,15 @@ def is_cloud_environment():
 
 def use_supabase():
     """Determine whether to use Supabase or SQLite."""
+    # Always prefer Supabase if available (both local and cloud)
+    if SUPABASE_AVAILABLE:
+        try:
+            # Check if Supabase credentials are available
+            if hasattr(st, 'secrets') and 'SUPABASE_URL' in st.secrets:
+                return True
+        except:
+            pass
+    # Fallback to the original cloud detection logic
     return SUPABASE_AVAILABLE and is_cloud_environment()
 
 def get_database_status():
