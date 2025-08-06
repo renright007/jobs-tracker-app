@@ -72,7 +72,9 @@ if 'career_goals' not in st.session_state:
     ])
 
 def save_jobs_to_database(jobs_df):
-    """Save changes from the DataFrame back to the database."""
+    """Save changes from the DataFrame back to the database using unified database system."""
+    from database_utils import use_supabase
+    
     if not st.session_state.get('authenticated', False):
         return False, "User not authenticated"
     
@@ -80,60 +82,96 @@ def save_jobs_to_database(jobs_df):
     if not user_id:
         return False, "User ID not found"
     
-    conn = get_db_connection()
     try:
-        # First, get the current data to compare (filtered by user)
-        current_data = pd.read_sql_query("SELECT * FROM jobs WHERE user_id = ?", conn, params=(user_id,))
+        if use_supabase():
+            from supabase_utils import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # For each row in the DataFrame
+            for _, row in jobs_df.iterrows():
+                job_data = {
+                    'company_name': row['company_name'],
+                    'job_title': row['job_title'],
+                    'job_description': row['job_description'],
+                    'application_url': row['application_url'],
+                    'status': row['status'],
+                    'sentiment': row['sentiment'],
+                    'notes': row['notes']
+                }
+                
+                # Check if this is an existing row (has an id)
+                if 'id' in row and pd.notna(row['id']):
+                    # Update existing row (only if it belongs to current user)
+                    supabase.table('jobs').update(job_data).eq('id', row['id']).eq('user_id', user_id).execute()
+                else:
+                    # Insert new row with user_id
+                    job_data['user_id'] = user_id
+                    job_data['date_added'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    supabase.table('jobs').insert(job_data).execute()
+        else:
+            conn = get_db_connection()
+            try:
+                # First, get the current data to compare (filtered by user)
+                current_data = pd.read_sql_query("SELECT * FROM jobs WHERE user_id = ?", conn, params=(user_id,))
+                
+                # For each row in the DataFrame
+                for _, row in jobs_df.iterrows():
+                    # Check if this is an existing row (has an id)
+                    if 'id' in row and pd.notna(row['id']):
+                        # Update existing row (only if it belongs to current user)
+                        conn.execute('''UPDATE jobs 
+                                      SET company_name = ?, 
+                                          job_title = ?, 
+                                          job_description = ?, 
+                                          application_url = ?, 
+                                          status = ?, 
+                                          sentiment = ?, 
+                                          notes = ?
+                                      WHERE id = ? AND user_id = ?''',
+                                   (row['company_name'], row['job_title'], 
+                                    row['job_description'], row['application_url'],
+                                    row['status'], row['sentiment'], row['notes'],
+                                    row['id'], user_id))
+                    else:
+                        # Insert new row with user_id
+                        conn.execute('''INSERT INTO jobs 
+                                      (company_name, job_title, job_description, 
+                                       application_url, status, sentiment, notes, date_added, user_id)
+                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                   (row['company_name'], row['job_title'], 
+                                    row['job_description'], row['application_url'],
+                                    row['status'], row['sentiment'], row['notes'],
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), user_id))
+                
+                conn.commit()
+            finally:
+                conn.close()
         
-        # For each row in the DataFrame
-        for _, row in jobs_df.iterrows():
-            # Check if this is an existing row (has an id)
-            if 'id' in row and pd.notna(row['id']):
-                # Update existing row (only if it belongs to current user)
-                conn.execute('''UPDATE jobs 
-                              SET company_name = ?, 
-                                  job_title = ?, 
-                                  job_description = ?, 
-                                  application_url = ?, 
-                                  status = ?, 
-                                  sentiment = ?, 
-                                  notes = ?
-                              WHERE id = ? AND user_id = ?''',
-                           (row['company_name'], row['job_title'], 
-                            row['job_description'], row['application_url'],
-                            row['status'], row['sentiment'], row['notes'],
-                            row['id'], user_id))
-            else:
-                # Insert new row with user_id
-                conn.execute('''INSERT INTO jobs 
-                              (company_name, job_title, job_description, 
-                               application_url, status, sentiment, notes, date_added, user_id)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                           (row['company_name'], row['job_title'], 
-                            row['job_description'], row['application_url'],
-                            row['status'], row['sentiment'], row['notes'],
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), user_id))
-        
-        conn.commit()
         return True, "Changes saved successfully!"
     except Exception as e:
         return False, f"Error saving changes: {str(e)}"
-    finally:
-        conn.close()
 
 
 # Page 2: Dashboard
 def show_dashboard():
-    """Show the dashboard with job application statistics."""
+    """Show the dashboard with job application statistics using unified database system."""
+    from database_utils import use_supabase
+    
     st.title("Dashboard")
     
     # Authentication is now handled at the main app level
     user_id = st.session_state.get('user_id')
     
     # Get job data (filtered by user)
-    conn = get_db_connection()
-    jobs_df = pd.read_sql_query("SELECT * FROM jobs WHERE user_id = ?", conn, params=(user_id,))
-    conn.close()
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        supabase = get_supabase_client()
+        result = supabase.table('jobs').select('*').eq('user_id', user_id).execute()
+        jobs_df = pd.DataFrame(result.data) if result.data else pd.DataFrame()
+    else:
+        conn = get_db_connection()
+        jobs_df = pd.read_sql_query("SELECT * FROM jobs WHERE user_id = ?", conn, params=(user_id,))
+        conn.close()
     
     if jobs_df.empty:
         st.warning("No job applications found. Add some jobs to see statistics.")

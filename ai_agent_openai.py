@@ -132,72 +132,120 @@ class OpenAIJobAgent:
         }
     
     def _get_job_data(self, job_id: int) -> Optional[Dict[str, Any]]:
-        """Get job data from database."""
+        """Get job data from database using unified database system."""
+        from database_utils import use_supabase
+        
         try:
-            conn = get_db_connection()
-            if self.user_id:
-                job_df = pd.read_sql_query(
-                    "SELECT * FROM jobs WHERE id = ? AND user_id = ?", 
-                    conn, 
-                    params=(job_id, self.user_id)
-                )
+            if use_supabase():
+                from supabase_utils import get_supabase_client
+                supabase = get_supabase_client()
+                
+                if self.user_id:
+                    result = supabase.table('jobs').select('*').eq('id', job_id).eq('user_id', self.user_id).execute()
+                else:
+                    result = supabase.table('jobs').select('*').eq('id', job_id).execute()
+                
+                if not result.data:
+                    return None
+                
+                return result.data[0]
             else:
-                job_df = pd.read_sql_query(
-                    "SELECT * FROM jobs WHERE id = ?", 
-                    conn, 
-                    params=(job_id,)
-                )
-            conn.close()
-            
-            if job_df.empty:
-                return None
-            
-            return job_df.iloc[0].to_dict()
+                conn = get_db_connection()
+                if self.user_id:
+                    job_df = pd.read_sql_query(
+                        "SELECT * FROM jobs WHERE id = ? AND user_id = ?", 
+                        conn, 
+                        params=(job_id, self.user_id)
+                    )
+                else:
+                    job_df = pd.read_sql_query(
+                        "SELECT * FROM jobs WHERE id = ?", 
+                        conn, 
+                        params=(job_id,)
+                    )
+                conn.close()
+                
+                if job_df.empty:
+                    return None
+                
+                return job_df.iloc[0].to_dict()
         except Exception as e:
             st.error(f"Error getting job data: {str(e)}")
             return None
     
     def _get_user_resume(self) -> str:
         """Get user's preferred resume content, falling back to latest if none selected."""
+        from database_utils import use_supabase
+        
         try:
-            conn = get_db_connection()
-            
-            if self.user_id:
-                # First try to get the user's preferred resume using the preferred_resume column
-                resume_df = pd.read_sql_query(
-                    "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' AND preferred_resume = 1 LIMIT 1",
-                    conn, params=(self.user_id,)
-                )
+            if use_supabase():
+                from supabase_utils import get_supabase_client
+                supabase = get_supabase_client()
                 
-                # If no preferred resume, fall back to latest resume
-                if resume_df.empty:
+                if self.user_id:
+                    # First try to get the user's preferred resume
+                    preferred_result = supabase.table('documents').select('file_path, document_content, document_name').eq('user_id', self.user_id).eq('document_type', 'Resume').eq('preferred_resume', 1).limit(1).execute()
+                    
+                    if preferred_result.data:
+                        resume_data = preferred_result.data[0]
+                    else:
+                        # Fall back to latest resume
+                        latest_result = supabase.table('documents').select('file_path, document_content, document_name').eq('user_id', self.user_id).eq('document_type', 'Resume').order('upload_date', desc=True).limit(1).execute()
+                        resume_data = latest_result.data[0] if latest_result.data else None
+                else:
+                    # For non-authenticated users, get latest resume
+                    latest_result = supabase.table('documents').select('file_path, document_content, document_name').eq('document_type', 'Resume').order('upload_date', desc=True).limit(1).execute()
+                    resume_data = latest_result.data[0] if latest_result.data else None
+                
+                if resume_data:
+                    doc_name = resume_data.get('document_name', 'Unknown')
+                    content = resume_data.get('document_content')
+                    if content:
+                        return f"[Using resume: {doc_name}]\n\n{str(content)}"
+                    else:
+                        file_path = resume_data.get('file_path')
+                        if file_path:
+                            extracted_content = self._extract_text_from_file(file_path)
+                            return f"[Using resume: {doc_name}]\n\n{extracted_content}"
+            else:
+                conn = get_db_connection()
+                
+                if self.user_id:
+                    # First try to get the user's preferred resume using the preferred_resume column
                     resume_df = pd.read_sql_query(
-                        "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                        "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' AND preferred_resume = 1 LIMIT 1",
                         conn, params=(self.user_id,)
                     )
-            else:
-                # For non-authenticated users, get latest resume
-                resume_df = pd.read_sql_query(
-                    "SELECT file_path, document_content, document_name FROM documents WHERE document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
-                    conn
-                )
-            
-            conn.close()
-            
-            if not resume_df.empty:
-                # Get document name for reference
-                doc_name = resume_df['document_name'].iloc[0] if pd.notna(resume_df['document_name'].iloc[0]) else "Unknown"
-                
-                # Try to get content from database first
-                content = resume_df['document_content'].iloc[0]
-                if content and pd.notna(content):
-                    return f"[Using resume: {doc_name}]\n\n{str(content)}"
+                    
+                    # If no preferred resume, fall back to latest resume
+                    if resume_df.empty:
+                        resume_df = pd.read_sql_query(
+                            "SELECT file_path, document_content, document_name FROM documents WHERE user_id = ? AND document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                            conn, params=(self.user_id,)
+                        )
                 else:
-                    # Fall back to extracting from file
-                    file_path = resume_df['file_path'].iloc[0]
-                    if pd.notna(file_path):
-                        extracted_content = self._extract_text_from_file(file_path)
-                        return f"[Using resume: {doc_name}]\n\n{extracted_content}"
+                    # For non-authenticated users, get latest resume
+                    resume_df = pd.read_sql_query(
+                        "SELECT file_path, document_content, document_name FROM documents WHERE document_type = 'Resume' ORDER BY upload_date DESC LIMIT 1",
+                        conn
+                    )
+                
+                conn.close()
+                
+                if not resume_df.empty:
+                    # Get document name for reference
+                    doc_name = resume_df['document_name'].iloc[0] if pd.notna(resume_df['document_name'].iloc[0]) else "Unknown"
+                    
+                    # Try to get content from database first
+                    content = resume_df['document_content'].iloc[0]
+                    if content and pd.notna(content):
+                        return f"[Using resume: {doc_name}]\n\n{str(content)}"
+                    else:
+                        # Fall back to extracting from file
+                        file_path = resume_df['file_path'].iloc[0]
+                        if pd.notna(file_path):
+                            extracted_content = self._extract_text_from_file(file_path)
+                            return f"[Using resume: {doc_name}]\n\n{extracted_content}"
             
             return "No resume found. Please upload a resume in the Document Portal and set it as your preferred resume."
         except Exception as e:
@@ -693,21 +741,34 @@ Remember: You're not just answering questions - you're helping the user succeed 
         return system_prompt.strip()
     
     def get_available_jobs(self) -> pd.DataFrame:
-        """Get list of available jobs for the user."""
+        """Get list of available jobs for the user using unified database system."""
+        from database_utils import use_supabase
+        
         try:
-            conn = get_db_connection()
-            if self.user_id:
-                jobs_df = pd.read_sql_query(
-                    "SELECT id, company_name, job_title, status, date_added FROM jobs WHERE user_id = ? ORDER BY date_added DESC",
-                    conn, params=(self.user_id,)
-                )
+            if use_supabase():
+                from supabase_utils import get_supabase_client
+                supabase = get_supabase_client()
+                
+                if self.user_id:
+                    result = supabase.table('jobs').select('id, company_name, job_title, status, date_added').eq('user_id', self.user_id).order('date_added', desc=True).execute()
+                else:
+                    result = supabase.table('jobs').select('id, company_name, job_title, status, date_added').order('date_added', desc=True).execute()
+                
+                return pd.DataFrame(result.data) if result.data else pd.DataFrame()
             else:
-                jobs_df = pd.read_sql_query(
-                    "SELECT id, company_name, job_title, status, date_added FROM jobs ORDER BY date_added DESC",
-                    conn
-                )
-            conn.close()
-            return jobs_df
+                conn = get_db_connection()
+                if self.user_id:
+                    jobs_df = pd.read_sql_query(
+                        "SELECT id, company_name, job_title, status, date_added FROM jobs WHERE user_id = ? ORDER BY date_added DESC",
+                        conn, params=(self.user_id,)
+                    )
+                else:
+                    jobs_df = pd.read_sql_query(
+                        "SELECT id, company_name, job_title, status, date_added FROM jobs ORDER BY date_added DESC",
+                        conn
+                    )
+                conn.close()
+                return jobs_df
         except Exception as e:
             st.error(f"Error getting jobs: {str(e)}")
             return pd.DataFrame()

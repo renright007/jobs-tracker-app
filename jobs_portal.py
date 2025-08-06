@@ -33,77 +33,133 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def save_jobs_to_database(jobs_df):
-    """Save changes from the DataFrame back to the database."""
-    conn = get_db_connection()
-    try:
-        # First, get the current data to compare
-        current_data = pd.read_sql_query("SELECT id FROM jobs", conn)
-        current_ids = set(current_data['id'])
-        
-        # Get the IDs in the edited DataFrame
-        edited_ids = set(jobs_df['id'].dropna())
-        
-        # Find IDs to delete (in current but not in edited)
-        ids_to_delete = current_ids - edited_ids
-        
-        # Delete removed rows
-        if ids_to_delete:
-            placeholders = ','.join('?' * len(ids_to_delete))
-            conn.execute(f'DELETE FROM jobs WHERE id IN ({placeholders})', tuple(ids_to_delete))
-        
-        # Update or insert remaining rows
-        for _, row in jobs_df.iterrows():
-            if pd.notna(row['id']):
-                # Update existing row
-                conn.execute('''UPDATE jobs 
-                              SET company_name = ?, 
-                                  job_title = ?, 
-                                  job_description = ?, 
-                                  application_url = ?, 
-                                  status = ?, 
-                                  sentiment = ?, 
-                                  notes = ?,
-                                  location = ?,
-                                  salary = ?,
-                                  applied_date = ?
-                              WHERE id = ?''',
-                           (row['company_name'], row['job_title'], 
-                            row['job_description'], row['application_url'],
-                            row['status'], row['sentiment'], row['notes'],
-                            row['location'], row['salary'], row['applied_date'],
-                            row['id']))
-            else:
-                # Insert new row
-                conn.execute('''INSERT INTO jobs 
-                              (company_name, job_title, job_description, 
-                               application_url, status, sentiment, notes, date_added,
-                               location, salary, applied_date)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                           (row['company_name'], row['job_title'], 
-                            row['job_description'], row['application_url'],
-                            row['status'], row['sentiment'], row['notes'],
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            row['location'], row['salary'], row['applied_date']))
-        
-        conn.commit()
-        return True, "Changes saved successfully!"
-    except Exception as e:
-        conn.rollback()
-        return False, f"Error saving changes: {str(e)}"
-    finally:
-        conn.close()
+    """Save changes from the DataFrame back to the database using unified database system."""
+    from database_utils import use_supabase
+    
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        try:
+            supabase = get_supabase_client()
+            
+            # Get current job IDs
+            current_result = supabase.table('jobs').select('id').execute()
+            current_ids = set(row['id'] for row in current_result.data)
+            
+            # Get edited job IDs
+            edited_ids = set(jobs_df['id'].dropna())
+            
+            # Delete removed jobs
+            ids_to_delete = current_ids - edited_ids
+            if ids_to_delete:
+                for job_id in ids_to_delete:
+                    supabase.table('jobs').delete().eq('id', job_id).execute()
+            
+            # Update or insert jobs
+            for _, row in jobs_df.iterrows():
+                job_data = {
+                    'company_name': row['company_name'],
+                    'job_title': row['job_title'],
+                    'job_description': row['job_description'],
+                    'application_url': row['application_url'],
+                    'status': row['status'],
+                    'sentiment': row['sentiment'],
+                    'notes': row['notes'],
+                    'location': row['location'],
+                    'salary': row['salary'],
+                    'applied_date': row['applied_date']
+                }
+                
+                if pd.notna(row['id']):
+                    # Update existing job
+                    supabase.table('jobs').update(job_data).eq('id', row['id']).execute()
+                else:
+                    # Insert new job
+                    job_data['date_added'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    supabase.table('jobs').insert(job_data).execute()
+            
+            return True, "Changes saved successfully!"
+        except Exception as e:
+            return False, f"Error saving changes: {str(e)}"
+    else:
+        # SQLite fallback
+        conn = get_db_connection()
+        try:
+            # First, get the current data to compare
+            current_data = pd.read_sql_query("SELECT id FROM jobs", conn)
+            current_ids = set(current_data['id'])
+            
+            # Get the IDs in the edited DataFrame
+            edited_ids = set(jobs_df['id'].dropna())
+            
+            # Find IDs to delete (in current but not in edited)
+            ids_to_delete = current_ids - edited_ids
+            
+            # Delete removed rows
+            if ids_to_delete:
+                placeholders = ','.join('?' * len(ids_to_delete))
+                conn.execute(f'DELETE FROM jobs WHERE id IN ({placeholders})', tuple(ids_to_delete))
+            
+            # Update or insert remaining rows
+            for _, row in jobs_df.iterrows():
+                if pd.notna(row['id']):
+                    # Update existing row
+                    conn.execute('''UPDATE jobs 
+                                  SET company_name = ?, 
+                                      job_title = ?, 
+                                      job_description = ?, 
+                                      application_url = ?, 
+                                      status = ?, 
+                                      sentiment = ?, 
+                                      notes = ?,
+                                      location = ?,
+                                      salary = ?,
+                                      applied_date = ?
+                                  WHERE id = ?''',
+                               (row['company_name'], row['job_title'], 
+                                row['job_description'], row['application_url'],
+                                row['status'], row['sentiment'], row['notes'],
+                                row['location'], row['salary'], row['applied_date'],
+                                row['id']))
+                else:
+                    # Insert new row
+                    conn.execute('''INSERT INTO jobs 
+                                  (company_name, job_title, job_description, 
+                                   application_url, status, sentiment, notes, date_added,
+                                   location, salary, applied_date)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                               (row['company_name'], row['job_title'], 
+                                row['job_description'], row['application_url'],
+                                row['status'], row['sentiment'], row['notes'],
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                row['location'], row['salary'], row['applied_date']))
+            
+            conn.commit()
+            return True, "Changes saved successfully!"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error saving changes: {str(e)}"
+        finally:
+            conn.close()
 
 def show_jobs_portal():
-    """Show the Jobs Portal with shadcn tabs."""
-    # Get database connection
-    conn = get_db_connection()
+    """Show the Jobs Portal with shadcn tabs using unified database system."""
+    from database_utils import use_supabase
     
     # Create shadcn tabs with default tab
     selected_tab = tabs(["Jobs Database", "Jobs Submissions", "URL Job Loader"], default_value="Jobs Database")
     
     if selected_tab == "Jobs Database":
         try:
-            jobs_df = pd.read_sql_query("SELECT * FROM jobs", conn)
+            if use_supabase():
+                from supabase_utils import get_supabase_client
+                supabase = get_supabase_client()
+                result = supabase.table('jobs').select('*').execute()
+                jobs_df = pd.DataFrame(result.data) if result.data else pd.DataFrame()
+            else:
+                conn = get_db_connection()
+                jobs_df = pd.read_sql_query("SELECT * FROM jobs", conn)
+                conn.close()
+                
             st.session_state.df = jobs_df
             if not jobs_df.empty:
                 # Create a form for the data editor
@@ -153,20 +209,45 @@ def show_jobs_portal():
             submitted = st.form_submit_button("Submit")
             
             if submitted:
+                from database_utils import use_supabase
                 user_id = st.session_state.get('user_id')
-                # Add to database
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('''INSERT INTO jobs 
-                            (user_id, company_name, job_title, job_description, application_url,
-                             status, sentiment, notes, date_added, location, salary, applied_date)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                         (user_id, company_name, job_title, job_description, application_url,
-                          status, sentiment, notes, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                          location, salary, applied_date.strftime("%Y-%m-%d") if applied_date else None))
-                conn.commit()
-                conn.close()
-                st.success("Job added successfully!")
+                
+                if use_supabase():
+                    from supabase_utils import get_supabase_client
+                    try:
+                        supabase = get_supabase_client()
+                        job_data = {
+                            'user_id': user_id,
+                            'company_name': company_name,
+                            'job_title': job_title,
+                            'job_description': job_description,
+                            'application_url': application_url,
+                            'status': status,
+                            'sentiment': sentiment,
+                            'notes': notes,
+                            'date_added': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'location': location,
+                            'salary': salary,
+                            'applied_date': applied_date.strftime("%Y-%m-%d") if applied_date else None
+                        }
+                        supabase.table('jobs').insert(job_data).execute()
+                        st.success("Job added successfully!")
+                    except Exception as e:
+                        st.error(f"Error adding job: {str(e)}")
+                else:
+                    # SQLite fallback
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('''INSERT INTO jobs 
+                                (user_id, company_name, job_title, job_description, application_url,
+                                 status, sentiment, notes, date_added, location, salary, applied_date)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                             (user_id, company_name, job_title, job_description, application_url,
+                              status, sentiment, notes, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                              location, salary, applied_date.strftime("%Y-%m-%d") if applied_date else None))
+                    conn.commit()
+                    conn.close()
+                    st.success("Job added successfully!")
     
     elif selected_tab == "URL Job Loader":
         # Initialize session state for job description and metadata
@@ -276,29 +357,50 @@ def show_jobs_portal():
                 applied_date = st.date_input("Date Applied", value=None)
                 
                 if st.form_submit_button("Save to Database"):
+                    from database_utils import use_supabase
                     try:
                         user_id = st.session_state.get('user_id')
-                        # Add to database
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''INSERT INTO jobs 
-                                    (user_id, company_name, job_title, job_description, application_url,
-                                     status, sentiment, notes, date_added, location, salary, applied_date)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                 (user_id,
-                                  st.session_state.ai_analysis['company_name'],
-                                  st.session_state.ai_analysis['job_title'],
-                                  st.session_state.ai_analysis['job_description'],
-                                  st.session_state.ai_analysis['application_url'],
-                                  st.session_state.ai_analysis['status'],
-                                  st.session_state.ai_analysis['sentiment'],
-                                  notes,
-                                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                  st.session_state.ai_analysis['location'],
-                                  st.session_state.ai_analysis['salary'],
-                                  applied_date.strftime("%Y-%m-%d") if applied_date else None))
-                        conn.commit()
-                        conn.close()
+                        
+                        if use_supabase():
+                            from supabase_utils import get_supabase_client
+                            supabase = get_supabase_client()
+                            job_data = {
+                                'user_id': user_id,
+                                'company_name': st.session_state.ai_analysis['company_name'],
+                                'job_title': st.session_state.ai_analysis['job_title'],
+                                'job_description': st.session_state.ai_analysis['job_description'],
+                                'application_url': st.session_state.ai_analysis['application_url'],
+                                'status': st.session_state.ai_analysis['status'],
+                                'sentiment': st.session_state.ai_analysis['sentiment'],
+                                'notes': notes,
+                                'date_added': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                'location': st.session_state.ai_analysis['location'],
+                                'salary': st.session_state.ai_analysis['salary'],
+                                'applied_date': applied_date.strftime("%Y-%m-%d") if applied_date else None
+                            }
+                            supabase.table('jobs').insert(job_data).execute()
+                        else:
+                            # SQLite fallback
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''INSERT INTO jobs 
+                                        (user_id, company_name, job_title, job_description, application_url,
+                                         status, sentiment, notes, date_added, location, salary, applied_date)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (user_id,
+                                      st.session_state.ai_analysis['company_name'],
+                                      st.session_state.ai_analysis['job_title'],
+                                      st.session_state.ai_analysis['job_description'],
+                                      st.session_state.ai_analysis['application_url'],
+                                      st.session_state.ai_analysis['status'],
+                                      st.session_state.ai_analysis['sentiment'],
+                                      notes,
+                                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                      st.session_state.ai_analysis['location'],
+                                      st.session_state.ai_analysis['salary'],
+                                      applied_date.strftime("%Y-%m-%d") if applied_date else None))
+                            conn.commit()
+                            conn.close()
                         
                         # Show success message in a prominent way
                         st.success("✅ Job details saved successfully!")
@@ -313,8 +415,3 @@ def show_jobs_portal():
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error saving job to database: {str(e)}")
-                        conn.rollback()
-                        conn.close()
-    
-    # Close database connection
-    conn.close()

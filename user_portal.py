@@ -52,18 +52,31 @@ def show_user_portal():
     """Show the User Portal with shadcn tabs."""
     # Authentication is now handled at the main app level
     user_id = st.session_state.get('user_id')
+    from database_utils import use_supabase
     
     # Create shadcn tabs with default tab
     selected_tab = tabs(["User Profile", "Document Portal"], default_value="User Profile")
     
     if selected_tab == "User Profile":
-        # Load documents from database (filtered by user)
-        conn = get_db_connection()
-        documents_df = pd.read_sql_query("SELECT * FROM documents WHERE document_type = 'Resume' AND user_id = ?", conn, params=(user_id,))
+        from database_utils import use_supabase
         
-        # Load user profile if it exists (filtered by user)
-        profile_df = pd.read_sql_query("SELECT * FROM user_profile WHERE user_id = ? ORDER BY id DESC LIMIT 1", conn, params=(user_id,))
-        conn.close()
+        # Load documents from database (filtered by user)
+        if use_supabase():
+            from supabase_utils import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # Get documents
+            docs_result = supabase.table('documents').select('*').eq('document_type', 'Resume').eq('user_id', user_id).execute()
+            documents_df = pd.DataFrame(docs_result.data) if docs_result.data else pd.DataFrame()
+            
+            # Get user profile
+            profile_result = supabase.table('user_profile').select('*').eq('user_id', user_id).order('id', desc=True).limit(1).execute()
+            profile_df = pd.DataFrame(profile_result.data) if profile_result.data else pd.DataFrame()
+        else:
+            conn = get_db_connection()
+            documents_df = pd.read_sql_query("SELECT * FROM documents WHERE document_type = 'Resume' AND user_id = ?", conn, params=(user_id,))
+            profile_df = pd.read_sql_query("SELECT * FROM user_profile WHERE user_id = ? ORDER BY id DESC LIMIT 1", conn, params=(user_id,))
+            conn.close()
         
         # Initialize variables with default values
         selected_resume = None
@@ -76,12 +89,16 @@ def show_user_portal():
         st.markdown("### 🎯 Current Preferred Resume")
         
         # Get current preferred resume from database
-        conn = get_db_connection()
-        preferred_df = pd.read_sql_query(
-            "SELECT document_name, upload_date FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
-            conn, params=(user_id,)
-        )
-        conn.close()
+        if use_supabase():
+            preferred_result = supabase.table('documents').select('document_name, upload_date').eq('user_id', user_id).eq('preferred_resume', 1).eq('document_type', 'Resume').execute()
+            preferred_df = pd.DataFrame(preferred_result.data) if preferred_result.data else pd.DataFrame()
+        else:
+            conn = get_db_connection()
+            preferred_df = pd.read_sql_query(
+                "SELECT document_name, upload_date FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
+                conn, params=(user_id,)
+            )
+            conn.close()
         
         if not preferred_df.empty:
             preferred_name = preferred_df['document_name'].iloc[0]
@@ -90,12 +107,16 @@ def show_user_portal():
             st.info("💡 This resume will be used by default for all AI-powered features like cover letter generation and job matching.")
             
             # Get the full document data including file path
-            conn = get_db_connection()
-            full_doc_df = pd.read_sql_query(
-                "SELECT file_path FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
-                conn, params=(user_id,)
-            )
-            conn.close()
+            if use_supabase():
+                full_doc_result = supabase.table('documents').select('file_path').eq('user_id', user_id).eq('preferred_resume', 1).eq('document_type', 'Resume').execute()
+                full_doc_df = pd.DataFrame(full_doc_result.data) if full_doc_result.data else pd.DataFrame()
+            else:
+                conn = get_db_connection()
+                full_doc_df = pd.read_sql_query(
+                    "SELECT file_path FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
+                    conn, params=(user_id,)
+                )
+                conn.close()
             
             if not full_doc_df.empty and full_doc_df['file_path'].iloc[0]:
                 selected_resume_path = full_doc_df['file_path'].iloc[0]
@@ -152,9 +173,13 @@ def show_user_portal():
         st.subheader("What are you looking for?")
         
         # Load career goals from database (filtered by user)
-        conn = get_db_connection()
-        goals_df = pd.read_sql_query("SELECT * FROM career_goals WHERE user_id = ? ORDER BY submission_date DESC LIMIT 1", conn, params=(user_id,))
-        conn.close()
+        if use_supabase():
+            goals_result = supabase.table('career_goals').select('*').eq('user_id', user_id).order('submission_date', desc=True).limit(1).execute()
+            goals_df = pd.DataFrame(goals_result.data) if goals_result.data else pd.DataFrame()
+        else:
+            conn = get_db_connection()
+            goals_df = pd.read_sql_query("SELECT * FROM career_goals WHERE user_id = ? ORDER BY submission_date DESC LIMIT 1", conn, params=(user_id,))
+            conn.close()
         
         # Initialize career goals
         career_goals = ""
@@ -173,17 +198,22 @@ def show_user_portal():
             if career_goals.strip():
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                conn = get_db_connection()
-                c = conn.cursor()
-                
-                # Insert new career goals
-                c.execute('''INSERT INTO career_goals 
-                            (goals, submission_date, user_id)
-                            VALUES (?, ?, ?)''',
-                         (career_goals, current_time, user_id))
-                
-                conn.commit()
-                conn.close()
+                if use_supabase():
+                    goals_data = {
+                        'goals': career_goals,
+                        'submission_date': current_time,
+                        'user_id': user_id
+                    }
+                    supabase.table('career_goals').insert(goals_data).execute()
+                else:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('''INSERT INTO career_goals 
+                                (goals, submission_date, user_id)
+                                VALUES (?, ?, ?)''',
+                             (career_goals, current_time, user_id))
+                    conn.commit()
+                    conn.close()
                 
                 st.success("Career goals saved successfully!")
                 st.rerun()
@@ -191,9 +221,13 @@ def show_user_portal():
                 st.warning("Please enter your career goals before saving.")
         
         # Display previous career goals submissions (filtered by user)
-        conn = get_db_connection()
-        all_goals_df = pd.read_sql_query("SELECT * FROM career_goals WHERE user_id = ? ORDER BY submission_date DESC LIMIT 2", conn, params=(user_id,))
-        conn.close()
+        if use_supabase():
+            all_goals_result = supabase.table('career_goals').select('*').eq('user_id', user_id).order('submission_date', desc=True).limit(2).execute()
+            all_goals_df = pd.DataFrame(all_goals_result.data) if all_goals_result.data else pd.DataFrame()
+        else:
+            conn = get_db_connection()
+            all_goals_df = pd.read_sql_query("SELECT * FROM career_goals WHERE user_id = ? ORDER BY submission_date DESC LIMIT 2", conn, params=(user_id,))
+            conn.close()
         
         if not all_goals_df.empty and len(all_goals_df) > 1:
             st.subheader("Previous Submission")
@@ -220,12 +254,16 @@ def show_user_portal():
         st.info("💡 Check the 'Preferred Resume' box for the resume you want AI features to use by default. Only one can be selected.")
         
         # Load documents from database
-        conn = get_db_connection()
-        documents_df = pd.read_sql_query(
-            "SELECT id, document_name, document_type, upload_date, preferred_resume FROM documents WHERE user_id = ? ORDER BY upload_date DESC", 
-            conn, params=(user_id,)
-        )
-        conn.close()
+        if use_supabase():
+            docs_result = supabase.table('documents').select('id, document_name, document_type, upload_date, preferred_resume').eq('user_id', user_id).order('upload_date', desc=True).execute()
+            documents_df = pd.DataFrame(docs_result.data) if docs_result.data else pd.DataFrame()
+        else:
+            conn = get_db_connection()
+            documents_df = pd.read_sql_query(
+                "SELECT id, document_name, document_type, upload_date, preferred_resume FROM documents WHERE user_id = ? ORDER BY upload_date DESC", 
+                conn, params=(user_id,)
+            )
+            conn.close()
         
         if not documents_df.empty:
             # Convert preferred_resume to boolean for display
@@ -288,12 +326,16 @@ def show_user_portal():
                 
                 with col3:
                     # Get file path for download
-                    conn = get_db_connection()
-                    file_path_df = pd.read_sql_query(
-                        "SELECT file_path FROM documents WHERE id = ?", 
-                        conn, params=(row['id'],)
-                    )
-                    conn.close()
+                    if use_supabase():
+                        file_path_result = supabase.table('documents').select('file_path').eq('id', row['id']).execute()
+                        file_path_df = pd.DataFrame(file_path_result.data) if file_path_result.data else pd.DataFrame()
+                    else:
+                        conn = get_db_connection()
+                        file_path_df = pd.read_sql_query(
+                            "SELECT file_path FROM documents WHERE id = ?", 
+                            conn, params=(row['id'],)
+                        )
+                        conn.close()
                     
                     if not file_path_df.empty and file_path_df['file_path'].iloc[0]:
                         file_path = file_path_df['file_path'].iloc[0]
