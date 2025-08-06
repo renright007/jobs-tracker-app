@@ -51,6 +51,12 @@ def get_db_connection():
 
 def init_db():
     """Initialize the database with updated schema including user relationships."""
+    # Skip SQLite initialization if we're using Supabase (cloud environment)
+    if use_supabase():
+        # In cloud environment, Supabase tables are already created via dashboard
+        return True
+    
+    # Local environment: initialize SQLite
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -417,6 +423,12 @@ def get_user_stats(user_id):
 
 def migrate_existing_data():
     """Migrate existing data to include user relationships and preferred_resume column."""
+    # Skip migration if we're using Supabase (cloud environment)
+    if use_supabase():
+        # In cloud environment, Supabase tables are already properly structured
+        return True
+    
+    # Local environment: perform SQLite migration
     conn = get_db_connection()
     try:
         c = conn.cursor()

@@ -8,9 +8,8 @@ from selenium_scraper import open_webpage, get_longest_text_content, scraper_ope
 import json
 import time
 
-# Initialize database and ensure directories exist
-init_db()
-ensure_directories()
+# Note: Database initialization is handled by main app.py to prevent cloud filesystem issues
+# ensure_directories() also moved to main app initialization
 
 # Initialize session state
 if 'jobs_data' not in st.session_state:

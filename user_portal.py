@@ -8,9 +8,8 @@ from utils import get_db_connection, save_uploaded_file, init_db, ensure_directo
 from database_utils import delete_document, save_documents_to_database, migrate_existing_data
 from streamlit_shadcn_ui import tabs
 
-# Initialize database and ensure directories exist
-init_db()
-ensure_directories()
+# Note: Database initialization is handled by main app.py to prevent cloud filesystem issues
+# ensure_directories() also moved to main app initialization
 
 # Run migration to ensure preferred_resume column exists
 migrate_existing_data()

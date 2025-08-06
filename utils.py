@@ -127,8 +127,8 @@ def update_db_schema(query=None):
         conn.rollback()
     conn.close()
 
-# Call update_db_schema when initializing
-init_db()
+# Note: init_db() is now called by applications when needed, not at module import time
+# This prevents SQLite initialization issues on read-only cloud filesystems
 
 def ensure_directories():
     """Ensure required directories exist."""
