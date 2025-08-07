@@ -98,108 +98,45 @@ class FirecrawlScraper:
             return None, "Firecrawl scraper not available. Check API key configuration."
         
         try:
-            # Configure scraping options
+            # Use simple scraping parameters
             scrape_params = {
-                'formats': ['markdown', 'html'],
-                'onlyMainContent': True,  # Extract main content only
-                'includeHtml': True,      # Include HTML for better parsing
-                'waitFor': 2000,          # Wait for dynamic content (2 seconds)
+                'formats': ['markdown'],
+                'onlyMainContent': True
             }
             
             # Perform the scrape
             result = self.client.scrape_url(url, scrape_params)
             
-            if result and 'success' in result and result['success']:
-                # Extract content from result
-                content = ""
-                
-                # Prefer markdown content for cleaner text
-                if 'markdown' in result.get('data', {}):
-                    content = result['data']['markdown']
-                elif 'content' in result.get('data', {}):
-                    content = result['data']['content']
-                elif 'html' in result.get('data', {}):
-                    content = result['data']['html']
-                else:
-                    return None, "No content found in Firecrawl response"
-                
-                # Clean and validate content
-                content = content.strip()
-                if len(content) < 100:  # Very short content might indicate an error
-                    return None, f"Content too short ({len(content)} chars). May indicate scraping failure."
-                
-                return content, None
-                
+            # Extract content from Firecrawl response
+            if result and hasattr(result, 'get'):
+                content = result.get('markdown', '') or result.get('content', '') or result.get('data', {}).get('markdown', '')
+            elif result and hasattr(result, 'markdown'):
+                content = result.markdown
+            elif result and hasattr(result, 'content'):
+                content = result.content
             else:
-                error_msg = result.get('error', 'Unknown error from Firecrawl API')
-                return None, f"Firecrawl API error: {error_msg}"
+                content = str(result) if result else ""
+            
+            if content and content.strip():
+                return content, None
+            else:
+                return None, "No content extracted from the webpage"
                 
         except Exception as e:
             return None, f"Error during Firecrawl scraping: {str(e)}"
     
-    def extract_job_info_with_ai(self, content: str) -> str:
-        """
-        Extract job information using OpenAI agent (reuses existing logic).
-        
-        Args:
-            content (str): Raw content from Firecrawl
-            
-        Returns:
-            str: JSON string with extracted job information
-        """
-        # Initialize OpenAI client
-        client = init_openai_client()
-        if client is None:
-            return json.dumps({"error": "OpenAI client initialization failed"})
-
-        # Define the extraction prompt (same as selenium_scraper.py)
-        system_message = f"""
-        You are an intelligent extraction agent. Given a snippet of **text**, scrape detailed information about the relevant below information:
-
-            - Company Name
-            - Job Title
-            - Job Description - 
-                Usually this will be the entirity of the text chunk. Ideally you want to cut the headers and footers.
-                MUST INCLUDE ALL DESCRIPTION TEXT RELATED TO THE JOB DESCRIPTION.
-                DO NOT MISS ANYTHING WITHIN THE LARGE DESCRIPTION TEXT, USUALLY ENDING WITH A LINK TO APPLY or BENEFIT INFORMATION. 
-                The job description should be word for word and include any large chunks of text the company, role, tasks, skills, pay, external or additional information, location details or anything else of interest to a potential candidate. 
-                DO NOT MISS ANYTHING!!!!!!!
-            - Job Location - Include city and country for example: "New York, USA"
-            - Job Salary - Include salary range for example: "$100,000 - $120,000 per year"
-
-        Your task is to analyze the text and return the information that best applies. Do not return duplicate information.
-
-            Text: "{content}"  
-
-        Return only the following information in a dictionary format: Company Name, Job Title, Job Description, Job Location, Job Salary.
-        """
-
-        try:
-            # Generate AI response using OpenAI API
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": "Please help me extract the information from the text the unstructured text provided."}
-                ]
-            )
-
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            return json.dumps({"error": f"AI extraction failed: {str(e)}"})
     
     def scrape_job_url(self, url: str) -> Dict:
         """
-        Complete job scraping pipeline: scrape URL + extract job info.
+        Simple job scraping: just scrape URL and return content.
         
         Args:
             url (str): Job listing URL
             
         Returns:
-            Dict: Job information or error details
+            Dict: Scraped content or error details
         """
-        # Step 1: Scrape the URL
+        # Scrape the URL
         content, error = self.scrape_url(url)
         
         if error:
@@ -209,40 +146,16 @@ class FirecrawlScraper:
                 "source": "firecrawl_scraping"
             }
         
-        # Step 2: Extract job information with AI
-        ai_result = self.extract_job_info_with_ai(content)
-        
-        try:
-            # Try to parse AI result as JSON
-            job_info = json.loads(ai_result) if isinstance(ai_result, str) else ai_result
-            
-            return {
-                "success": True,
-                "data": {
-                    "company_name": job_info.get("Company Name", ""),
-                    "job_title": job_info.get("Job Title", ""),
-                    "job_description": job_info.get("Job Description", ""),
-                    "job_location": job_info.get("Job Location", ""),
-                    "job_salary": job_info.get("Job Salary", ""),
-                    "scraped_content": content[:1000] + "..." if len(content) > 1000 else content,  # Preview
-                    "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "source_url": url
-                },
-                "source": "firecrawl_ai_extraction"
-            }
-            
-        except json.JSONDecodeError:
-            # AI didn't return valid JSON, return raw result
-            return {
-                "success": True,
-                "data": {
-                    "raw_ai_response": ai_result,
-                    "scraped_content": content[:1000] + "..." if len(content) > 1000 else content,
-                    "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "source_url": url
-                },
-                "source": "firecrawl_raw_extraction"
-            }
+        # Return the scraped content - let the UI handle AI processing
+        return {
+            "success": True,
+            "data": {
+                "scraped_content": content,
+                "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "source_url": url
+            },
+            "source": "firecrawl_scraping"
+        }
 
 
 # Convenience functions for backward compatibility
@@ -266,7 +179,7 @@ def is_firecrawl_available() -> bool:
     return scraper.is_available()
 
 
-# Test function
+# Test function for debugging
 if __name__ == "__main__":
     # Test the scraper
     print("🔥 Firecrawl Scraper Test")
@@ -274,15 +187,39 @@ if __name__ == "__main__":
     
     scraper = FirecrawlScraper()
     
-    if not scraper.is_available():
-        print("❌ Firecrawl not available. Check API key configuration.")
+    # Debug API key availability
+    api_key = scraper._get_firecrawl_api_key()
+    if api_key:
+        print(f"✅ API key found: {api_key[:8]}...{api_key[-4:]}")
     else:
-        print("✅ Firecrawl scraper initialized successfully")
+        print("❌ No API key found")
+        print("Check FIRECRAWL_API_KEY in:")
+        print("  - Environment variables")
+        print("  - .streamlit/secrets.toml")
+        print("  - Streamlit secrets")
+    
+    # Check availability
+    if not scraper.is_available():
+        print("❌ Firecrawl not available")
+        if not FIRECRAWL_AVAILABLE:
+            print("  - firecrawl-py not installed")
+        if not scraper.client:
+            print("  - Client initialization failed")
+    else:
+        print("✅ Firecrawl scraper ready")
         
-        # Test with a sample URL (replace with actual job URL)
-        test_url = "https://jobs.example.com/sample-job"
-        print(f"🧪 Testing with: {test_url}")
-        
-        result = scraper.scrape_job_url(test_url)
-        print("\n📄 Result:")
-        print(json.dumps(result, indent=2))
+        # Test with a simple URL
+        test_url = input("\nEnter a job URL to test (or press Enter to skip): ").strip()
+        if test_url:
+            print(f"🧪 Testing with: {test_url}")
+            
+            result = scraper.scrape_job_url(test_url)
+            print("\n📄 Result:")
+            print(json.dumps(result, indent=2))
+            
+            if result.get("success") and "scraped_content" in result.get("data", {}):
+                content = result["data"]["scraped_content"]
+                print(f"\n📊 Content preview ({len(content)} chars):")
+                print(content[:500] + "..." if len(content) > 500 else content)
+        else:
+            print("\n⏭️ Skipping URL test")

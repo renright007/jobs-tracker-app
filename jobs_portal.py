@@ -146,18 +146,18 @@ def show_jobs_portal():
     from database_utils import use_supabase
     
     # Create shadcn tabs with default tab
-    selected_tab = tabs(["Jobs Database", "Jobs Submissions", "URL Job Loader"], default_value="Jobs Database")
+    selected_tab = tabs(["Jobs Database", "Jobs Submissions", "Firecrawl Job Scraper"], default_value="Jobs Database")
     
     if selected_tab == "Jobs Database":
         try:
             if use_supabase():
                 from supabase_utils import get_supabase_client
                 supabase = get_supabase_client()
-                result = supabase.table('jobs').select('*').execute()
+                result = supabase.table('jobs').select('*').order('date_added', desc=True).execute()
                 jobs_df = pd.DataFrame(result.data) if result.data else pd.DataFrame()
             else:
                 conn = get_db_connection()
-                jobs_df = pd.read_sql_query("SELECT * FROM jobs", conn)
+                jobs_df = pd.read_sql_query("SELECT * FROM jobs ORDER BY date_added DESC", conn)
                 conn.close()
                 
             st.session_state.df = jobs_df
@@ -249,6 +249,243 @@ def show_jobs_portal():
                     conn.close()
                     st.success("Job added successfully!")
     
+    elif selected_tab == "Firecrawl Job Scraper":
+        st.info("🔥 **Firecrawl-Only Scraper** - Test the cloud-compatible Firecrawl API directly")
+        
+        # Initialize session state for Firecrawl scraper (separate from URL Job Loader)
+        if 'firecrawl_job_description' not in st.session_state:
+            st.session_state.firecrawl_job_description = None
+        if 'firecrawl_job_metadata' not in st.session_state:
+            st.session_state.firecrawl_job_metadata = {}
+        if 'firecrawl_ai_analysis' not in st.session_state:
+            st.session_state.firecrawl_ai_analysis = None
+        if 'firecrawl_scrape_time' not in st.session_state:
+            st.session_state.firecrawl_scrape_time = None
+        
+        # Check if Firecrawl is available
+        if not is_firecrawl_available():
+            st.error("🚫 Firecrawl API not available. Please check your API key configuration.")
+            st.info("💡 See FIRECRAWL_SETUP.md for setup instructions.")
+            return
+        
+        st.success("✅ Firecrawl API is ready for testing!")
+        
+        # Create a form for job details
+        with st.form("firecrawl_job_form"):
+            st.subheader("Enter Job Details")
+            
+            # Input fields (same as URL Job Loader)
+            job_url = st.text_input("Job URL", help="Enter the job posting URL to scrape with Firecrawl")
+            listing_type = st.selectbox(
+                "Listing Type",
+                ["Company Listing", "Indeed", "LinkedIn", "Recruiter", "Upwork"]
+            )
+            application_status = st.selectbox(
+                "Application Status", 
+                ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected"]
+            )
+            
+            # Submit button
+            get_details = st.form_submit_button("🔥 Scrape with Firecrawl")
+            
+            if get_details and job_url:
+                # Store metadata
+                st.session_state.firecrawl_job_metadata = {
+                    "job_url": job_url,
+                    "listing_type": listing_type,
+                    "application_status": application_status
+                }
+                
+                # Show scraping method
+                st.info("🔥 Using Firecrawl API for scraping")
+                
+                with st.spinner("Scraping job details with Firecrawl..."):
+                    import time as time_module
+                    start_time = time_module.time()
+                    
+                    # Use Firecrawl exclusively (no fallbacks)
+                    result = scrape_job_with_firecrawl(job_url)
+                    
+                    end_time = time_module.time()
+                    scrape_time = end_time - start_time
+                    st.session_state.firecrawl_scrape_time = scrape_time
+                    
+                    if result.get("success"):
+                        # Extract content from simplified response
+                        data = result.get("data", {})
+                        scraped_content = data.get("scraped_content", "")
+                        
+                        if scraped_content and scraped_content.strip():
+                            # Store in session state for AI parsing
+                            st.session_state.firecrawl_job_description = scraped_content
+                            
+                            # Show performance metrics
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("⏱️ Scrape Time", f"{scrape_time:.2f}s")
+                            with col2:
+                                st.metric("📄 Content Length", f"{len(scraped_content):,} chars")
+                            with col3:
+                                word_count = len(scraped_content.split())
+                                st.metric("📝 Word Count", f"{word_count:,} words")
+                            
+                            # Display the scraped content
+                            st.subheader("📄 Scraped Content")
+                            st.text_area("Job Description (Firecrawl)", value=scraped_content, height=300, key="firecrawl_content_display")
+                            
+                            # Always require manual AI parsing for consistency
+                            st.info("💡 Click 'Parse with AI' below to extract job information")
+                        else:
+                            st.error("❌ Could not extract content from the webpage using Firecrawl")
+                            st.info("The page may have restrictions or the content may be behind authentication")
+                            
+                            # Show debug information
+                            if data:
+                                st.write("**Debug - Raw Response Data:**")
+                                st.json(data)
+                    else:
+                        error = result.get("error", "Unknown error")
+                        st.error(f"❌ Firecrawl scraping failed: {error}")
+                        st.info("💡 This could be due to:")
+                        st.write("- Site blocking automated access")
+                        st.write("- Invalid URL")
+                        st.write("- API rate limits or quota exceeded")
+                        st.write("- Page requiring authentication")
+                        st.write("- Firecrawl API key issues")
+                        
+                        # Show debug information
+                        st.write("**Debug - Full Response:**")
+                        st.json(result)
+        
+        # Show Parse with AI button if we have content (but no AI analysis yet)
+        if st.session_state.firecrawl_job_description and not st.session_state.firecrawl_ai_analysis:
+            if st.button("🤖 Parse with AI", key="firecrawl_parse_ai"):
+                with st.spinner("Analyzing content with AI..."):
+                    # Get AI analysis using the existing function
+                    ai_analysis = scraper_openai_agent(st.session_state.firecrawl_job_description)
+                    
+                    # Display AI analysis
+                    st.subheader("🤖 AI Analysis")
+                    
+                    # Parse AI response
+                    if isinstance(ai_analysis, str):
+                        try:
+                            analysis_dict = json.loads(ai_analysis)
+                        except:
+                            analysis_dict = {"Analysis": ai_analysis}
+                    else:
+                        analysis_dict = ai_analysis
+                    
+                    # Map to our standard format
+                    job_details = {
+                        'company_name': analysis_dict.get('Company Name', ''),
+                        'job_title': analysis_dict.get('Job Title', ''),
+                        'job_description': analysis_dict.get('Job Description', ''),
+                        'application_url': st.session_state.firecrawl_job_metadata['job_url'],
+                        'status': 'Not Applied',
+                        'sentiment': 'Neutral',
+                        'location': analysis_dict.get('Job Location', 'Not Listed'),
+                        'salary': analysis_dict.get('Job Salary', 'Not Listed'),
+                        'applied_date': '',
+                        'notes': f'Scraped with Firecrawl API in {st.session_state.firecrawl_scrape_time:.2f}s'
+                    }
+                    
+                    # Store in session state
+                    st.session_state.firecrawl_ai_analysis = job_details
+                    
+                    # Display the standardized format
+                    st.json(job_details)
+        
+        # Show save form if we have AI analysis
+        if st.session_state.firecrawl_ai_analysis:
+            with st.form("save_firecrawl_job_form"):
+                st.subheader("💾 Save Job Details")
+                
+                # Show a summary of what will be saved
+                job_data = st.session_state.firecrawl_ai_analysis
+                st.write(f"**Company:** {job_data['company_name']}")
+                st.write(f"**Position:** {job_data['job_title']}")
+                st.write(f"**Location:** {job_data['location']}")
+                st.write(f"**Salary:** {job_data['salary']}")
+                
+                # Only show editable fields
+                notes = st.text_area("Notes", help="Add any additional notes about this job")
+                applied_date = st.date_input("Date Applied", value=None)
+                
+                if st.form_submit_button("💾 Save to Database", use_container_width=True):
+                    from database_utils import use_supabase
+                    try:
+                        user_id = st.session_state.get('user_id')
+                        
+                        # Update notes before saving
+                        st.session_state.firecrawl_ai_analysis['notes'] = notes
+                        
+                        if use_supabase():
+                            from supabase_utils import get_supabase_client
+                            supabase = get_supabase_client()
+                            job_data = {
+                                'user_id': user_id,
+                                'company_name': st.session_state.firecrawl_ai_analysis['company_name'],
+                                'job_title': st.session_state.firecrawl_ai_analysis['job_title'],
+                                'job_description': st.session_state.firecrawl_ai_analysis['job_description'],
+                                'application_url': st.session_state.firecrawl_ai_analysis['application_url'],
+                                'status': st.session_state.firecrawl_ai_analysis['status'],
+                                'sentiment': st.session_state.firecrawl_ai_analysis['sentiment'],
+                                'notes': notes,
+                                'date_added': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                'location': st.session_state.firecrawl_ai_analysis['location'],
+                                'salary': st.session_state.firecrawl_ai_analysis['salary'],
+                                'applied_date': applied_date.strftime("%Y-%m-%d") if applied_date else None
+                            }
+                            supabase.table('jobs').insert(job_data).execute()
+                        else:
+                            # SQLite fallback
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''INSERT INTO jobs 
+                                        (user_id, company_name, job_title, job_description, application_url,
+                                         status, sentiment, notes, date_added, location, salary, applied_date)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (user_id,
+                                      st.session_state.firecrawl_ai_analysis['company_name'],
+                                      st.session_state.firecrawl_ai_analysis['job_title'],
+                                      st.session_state.firecrawl_ai_analysis['job_description'],
+                                      st.session_state.firecrawl_ai_analysis['application_url'],
+                                      st.session_state.firecrawl_ai_analysis['status'],
+                                      st.session_state.firecrawl_ai_analysis['sentiment'],
+                                      notes,
+                                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                      st.session_state.firecrawl_ai_analysis['location'],
+                                      st.session_state.firecrawl_ai_analysis['salary'],
+                                      applied_date.strftime("%Y-%m-%d") if applied_date else None))
+                            conn.commit()
+                            conn.close()
+                        
+                        # Show success message
+                        st.success("🎉 Job details saved successfully via Firecrawl!")
+                        
+                        # Show performance summary
+                        st.info(f"📊 **Scraping Summary:** {st.session_state.firecrawl_scrape_time:.2f}s scrape time, {len(st.session_state.firecrawl_job_description):,} characters extracted")
+                        
+                        # Clear session state after successful save
+                        st.session_state.firecrawl_job_description = None
+                        st.session_state.firecrawl_job_metadata = {}
+                        st.session_state.firecrawl_ai_analysis = None
+                        st.session_state.firecrawl_scrape_time = None
+                        
+                        # Add a small delay to ensure the message is seen
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error saving job to database: {str(e)}")
+
+
+# =============================================================================
+# ARCHIVED CODE - URL Job Loader (Selenium-based)
+# =============================================================================
+# This code is preserved but not active in the current application
+# Uncomment and add "URL Job Loader" back to tabs list if you want to re-enable it
+"""
     elif selected_tab == "URL Job Loader":
         # Initialize session state for job description and metadata
         if 'job_description' not in st.session_state:
@@ -477,3 +714,4 @@ def show_jobs_portal():
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error saving job to database: {str(e)}")
+"""
