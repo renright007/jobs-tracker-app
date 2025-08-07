@@ -158,6 +158,59 @@ class FirecrawlScraper:
         }
 
 
+def scraper_openai_agent(text: str) -> str:
+    """
+    Extract job information from text using OpenAI API with proper error handling.
+    
+    Args:
+        text (str): Raw text content to analyze
+        
+    Returns:
+        str: JSON string with extracted job information or error details
+    """
+    # Initialize OpenAI client
+    client = init_openai_client()
+    if client is None:
+        return json.dumps({"error": "OpenAI client initialization failed. Please check your API key configuration."})
+    
+    # Define the prompt and system message
+    prompt = "Please help me extract the information from the text the unstructured text provided."
+    system_message = f"""
+    You are an intelligent extraction agent. Given a snippet of **text**, scrape detailed information about the relevant below information:
+        - Company Name
+        - Job Title
+        - Job Description - 
+            Usually this will be the entirity of the text chunk. Ideally you want to cut the headers and footers.
+            MUST INCLUDE ALL DESCRIPTION TEXT RELATED TO THE JOB DESCRIPTION.
+            DO NOT MISS ANYTHING WITHIN THE LARGE DESCRIPTION TEXT, USUALLY ENDING WITH A LINK TO APPLY or BENEFIT INFORMATION. 
+            The job description should be word for word and include any large chunks of text the company, role, tasks, skills, pay, external or additional information, location details or anything else of interest to a potential candidate. 
+            DO NOT MISS ANYTHING!!!!!!!
+        - Job Location - Include city and country for example: "New York, USA". ENSURE TO USE THE FOLLOWING FORMAT: "City, Country".
+        - Job Salary - Include salary range for example: "$100,000 - $120,000 per year". If missing, use "Not Listed".
+    
+    Your task is to analyze the text and return the information that best applies. Do not return duplicate information.
+    
+        Text: "{text}"  
+    
+    Return only the following information in a dictionary format: Company Name, Job Title, Job Description, Job Location, Job Salary.
+    """
+    
+    try:
+        # Generate AI response using OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        return json.dumps({"error": f"OpenAI API call failed: {str(e)}"})
+
+
 # Convenience functions for backward compatibility
 def scrape_job_with_firecrawl(url: str) -> Dict:
     """

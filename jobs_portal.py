@@ -3,8 +3,8 @@ import pandas as pd
 from datetime import datetime
 from utils import get_db_connection, init_db, ensure_directories
 from streamlit_shadcn_ui import tabs
-from selenium_scraper import open_webpage, get_longest_text_content, scraper_openai_agent, save_job_to_database
-from firecrawl_scraper import scrape_job_with_firecrawl, is_firecrawl_available
+from selenium_scraper import open_webpage, get_longest_text_content, save_job_to_database
+from firecrawl_scraper import scrape_job_with_firecrawl, is_firecrawl_available, scraper_openai_agent
 
 import json
 import time
