@@ -137,34 +137,11 @@ def ensure_directories():
     Path("assets").mkdir(exist_ok=True)
 
 def save_uploaded_file(uploaded_file, document_name, document_type, user_id):
-    """Save uploaded file and add to database - DEPRECATED: Use user_portal.py functions instead."""
-    # This function is deprecated - use database_utils.add_document() for unified database support
-    from database_utils import add_document, use_supabase
-    
-    # Generate file path
-    file_path = f"data/documents/{document_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
-    
-    # Save file (Note: This won't work in cloud environments - needs cloud storage)
-    if use_supabase():
-        st.warning("⚠️ File uploads don't work with cloud storage. This function is deprecated for Supabase.")
-        return None
-    
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    
-    # Add to database using unified function
-    document_data = {
-        'document_name': document_name,
-        'document_type': document_type,
-        'file_path': file_path
-    }
-    success, message = add_document(user_id, document_data)
-    
-    if not success:
-        st.error(f"Error adding document to database: {message}")
-        return None
-    
-    return file_path
+    """Save uploaded file and add to database - DEPRECATED: Use upload_document_with_content() from user_portal.py instead."""
+    st.error("🚨 This function is deprecated and not cloud-compatible!")
+    st.info("💡 Please use the new document upload system that stores content in the database.")
+    st.info("🔧 The new system works in both local and cloud environments.")
+    return None
 
 def get_custom_css():
     """Return custom CSS for the application."""

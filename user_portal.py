@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 from PyPDF2 import PdfReader
 from docx import Document
-from utils import get_db_connection, save_uploaded_file, init_db, ensure_directories
+from utils import get_db_connection, init_db, ensure_directories
 from database_utils import delete_document, save_documents_to_database, migrate_existing_data
 from streamlit_shadcn_ui import tabs
 
@@ -46,6 +46,89 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def extract_text_from_uploaded_file(uploaded_file):
+    """Extract text content from uploaded file for database storage."""
+    try:
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        # Reset file pointer to beginning
+        uploaded_file.seek(0)
+        
+        if file_extension == 'pdf':
+            # Extract text from PDF
+            reader = PdfReader(uploaded_file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+            
+        elif file_extension == 'docx':
+            # Extract text from DOCX
+            doc = Document(uploaded_file)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            return text.strip()
+            
+        elif file_extension == 'txt':
+            # Read text file
+            text = uploaded_file.read().decode('utf-8')
+            return text.strip()
+            
+        else:
+            return f"Unsupported file type: {file_extension}"
+            
+    except Exception as e:
+        return f"Error extracting content: {str(e)}"
+
+def upload_document_with_content(uploaded_file, document_name, document_type, user_id):
+    """Upload document and store content in database for cloud compatibility."""
+    from database_utils import use_supabase
+    
+    try:
+        # Extract text content from uploaded file
+        document_content = extract_text_from_uploaded_file(uploaded_file)
+        
+        if document_content.startswith("Error") or document_content.startswith("Unsupported"):
+            return False, document_content
+        
+        # Prepare document data
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        if use_supabase():
+            from supabase_utils import get_supabase_client
+            supabase = get_supabase_client()
+            
+            document_data = {
+                'user_id': user_id,
+                'document_name': document_name,
+                'document_type': document_type,
+                'document_content': document_content,
+                'upload_date': current_time,
+                'file_path': None,  # Cloud-friendly: no file path dependency
+                'preferred_resume': 0
+            }
+            
+            result = supabase.table('documents').insert(document_data).execute()
+            return True, "Document uploaded and content stored successfully!"
+            
+        else:
+            # SQLite fallback
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            c.execute('''INSERT INTO documents 
+                        (user_id, document_name, document_type, document_content, 
+                         upload_date, file_path, preferred_resume)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                     (user_id, document_name, document_type, document_content,
+                      current_time, None, 0))
+            
+            conn.commit()
+            conn.close()
+            return True, "Document uploaded and content stored successfully!"
+            
+    except Exception as e:
+        return False, f"Error uploading document: {str(e)}"
+
 
 def show_user_portal():
     """Show the User Portal with shadcn tabs."""
@@ -53,17 +136,21 @@ def show_user_portal():
     user_id = st.session_state.get('user_id')
     from database_utils import use_supabase
     
+    # Initialize Supabase client once for entire function if using cloud database
+    supabase = None
+    if use_supabase():
+        from supabase_utils import get_supabase_client
+        supabase = get_supabase_client()
+    
+    st.title("User Portal")
+    st.info("👋 Manage your documents, set preferences, and track your career goals.")
+    
     # Create shadcn tabs with default tab
     selected_tab = tabs(["User Profile", "Document Portal"], default_value="User Profile")
     
     if selected_tab == "User Profile":
-        from database_utils import use_supabase
-        
         # Load documents from database (filtered by user)
         if use_supabase():
-            from supabase_utils import get_supabase_client
-            supabase = get_supabase_client()
-            
             # Get documents
             docs_result = supabase.table('documents').select('*').eq('document_type', 'Resume').eq('user_id', user_id).execute()
             documents_df = pd.DataFrame(docs_result.data) if docs_result.data else pd.DataFrame()
@@ -105,61 +192,77 @@ def show_user_portal():
             st.success(f"✅ **{preferred_name}** (uploaded: {preferred_date})")
             st.info("💡 This resume will be used by default for all AI-powered features like cover letter generation and job matching.")
             
-            # Get the full document data including file path
+            # Get the full document data including content
             if use_supabase():
-                full_doc_result = supabase.table('documents').select('file_path').eq('user_id', user_id).eq('preferred_resume', 1).eq('document_type', 'Resume').execute()
+                full_doc_result = supabase.table('documents').select('*').eq('user_id', user_id).eq('preferred_resume', 1).eq('document_type', 'Resume').execute()
                 full_doc_df = pd.DataFrame(full_doc_result.data) if full_doc_result.data else pd.DataFrame()
             else:
                 conn = get_db_connection()
                 full_doc_df = pd.read_sql_query(
-                    "SELECT file_path FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
+                    "SELECT * FROM documents WHERE user_id = ? AND preferred_resume = 1 AND document_type = 'Resume'", 
                     conn, params=(user_id,)
                 )
                 conn.close()
             
-            if not full_doc_df.empty and full_doc_df['file_path'].iloc[0]:
-                selected_resume_path = full_doc_df['file_path'].iloc[0]
+            if not full_doc_df.empty:
+                resume_data = full_doc_df.iloc[0]
                 
-                # Display resume content in expandable section
+                # Display resume content from database (cloud-friendly)
                 with st.expander("👁️ View Resume Content"):
-                    file_extension = selected_resume_path.split('.')[-1].lower()
-                    
-                    try:
-                        if file_extension == 'pdf':
-                            # Extract text from PDF
-                            reader = PdfReader(selected_resume_path)
-                            text = ""
-                            for page in reader.pages:
-                                text += page.extract_text() + "\n"
-                        elif file_extension == 'docx':
-                            # Extract text from DOCX
-                            doc = Document(selected_resume_path)
-                            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-                        elif file_extension == 'txt':
-                            # Read text file
-                            with open(selected_resume_path, 'r', encoding='utf-8') as file:
-                                text = file.read()
-                        else:
-                            st.error(f"Unsupported file type: {file_extension}")
-                            text = None
+                    if pd.notna(resume_data['document_content']) and resume_data['document_content']:
+                        # Use database content (preferred method)
+                        st.text_area(
+                            "Resume Content (from database)", 
+                            value=resume_data['document_content'], 
+                            height=300,
+                            disabled=True
+                        )
                         
-                        if text:
-                            # Display the extracted text
-                            st.text_area("Resume Content", text, height=300)
+                        # Show content stats
+                        content_length = len(resume_data['document_content'])
+                        word_count = len(resume_data['document_content'].split())
+                        st.caption(f"📊 Content Stats: {content_length:,} characters, ~{word_count:,} words")
+                        
+                    elif pd.notna(resume_data['file_path']) and resume_data['file_path']:
+                        # Fallback to file reading for legacy documents
+                        st.warning("⚠️ Using legacy file-based content (may not work in cloud)")
+                        selected_resume_path = resume_data['file_path']
+                        file_extension = selected_resume_path.split('.')[-1].lower()
+                        
+                        try:
+                            # Check if file exists first
+                            if not os.path.exists(selected_resume_path):
+                                st.error(f"❌ File not found: {selected_resume_path}")
+                                st.info("🔧 This is a cloud deployment issue where local files aren't available.")
+                                st.info("💡 **Tip:** Re-upload your document to store content in database.")
+                                text = None
+                            else:
+                                if file_extension == 'pdf':
+                                    reader = PdfReader(selected_resume_path)
+                                    text = ""
+                                    for page in reader.pages:
+                                        text += page.extract_text() + "\n"
+                                elif file_extension == 'docx':
+                                    doc = Document(selected_resume_path)
+                                    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+                                elif file_extension == 'txt':
+                                    with open(selected_resume_path, 'r', encoding='utf-8') as file:
+                                        text = file.read()
+                                else:
+                                    st.error(f"Unsupported file type: {file_extension}")
+                                    text = None
                             
-                            # Add download button
-                            if os.path.exists(selected_resume_path):
-                                st.download_button(
-                                    label="📥 Download Original File",
-                                    data=open(selected_resume_path, 'rb').read(),
-                                    file_name=selected_resume_path.split('/')[-1],
-                                    mime=f"application/{file_extension}"
-                                )
-                            
-                    except Exception as e:
-                        st.error(f"Error processing file: {str(e)}")
+                            if text:
+                                st.text_area("Resume Content (from file)", text, height=300, disabled=True)
+                                
+                        except Exception as e:
+                            st.error(f"Error processing file: {str(e)}")
+                            st.info("🔧 This might be due to file corruption or cloud deployment limitations.")
+                    else:
+                        st.warning("⚠️ No content available for this resume.")
+                        st.info("💡 Try re-uploading your resume to store content in the database.")
             else:
-                st.warning("File path not found for preferred resume")
+                st.warning("⚠️ No preferred resume found.")
         else:
             st.warning("⚠️ No preferred resume selected")
             st.info("📋 Go to the **Document Portal** tab to select your preferred resume by checking the box next to it.")
@@ -234,6 +337,7 @@ def show_user_portal():
                 st.write(all_goals_df.iloc[1]['goals'])
     
     elif selected_tab == "Document Portal":
+        
         # Upload new document section
         st.subheader("📄 Upload New Document")
         uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'docx', 'txt'])
@@ -242,9 +346,15 @@ def show_user_portal():
             document_type = st.selectbox("Document Type", ["Resume", "Cover Letter", "Other"])
             
             if st.button("Save Document"):
-                file_path = save_uploaded_file(uploaded_file, document_name, document_type, user_id)
-                st.success("Document uploaded successfully!")
-                st.rerun()
+                if not document_name.strip():
+                    st.error("Please enter a document name.")
+                else:
+                    success, message = upload_document_with_content(uploaded_file, document_name, document_type, user_id)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
         
         st.markdown("---")
         
@@ -252,14 +362,14 @@ def show_user_portal():
         st.subheader("📋 Manage Your Documents")
         st.info("💡 Check the 'Preferred Resume' box for the resume you want AI features to use by default. Only one can be selected.")
         
-        # Load documents from database
+        # Load documents from database (include document_content for viewing)
         if use_supabase():
-            docs_result = supabase.table('documents').select('id, document_name, document_type, upload_date, preferred_resume').eq('user_id', user_id).order('upload_date', desc=True).execute()
+            docs_result = supabase.table('documents').select('id, document_name, document_type, upload_date, preferred_resume, document_content').eq('user_id', user_id).order('upload_date', desc=True).execute()
             documents_df = pd.DataFrame(docs_result.data) if docs_result.data else pd.DataFrame()
         else:
             conn = get_db_connection()
             documents_df = pd.read_sql_query(
-                "SELECT id, document_name, document_type, upload_date, preferred_resume FROM documents WHERE user_id = ? ORDER BY upload_date DESC", 
+                "SELECT id, document_name, document_type, upload_date, preferred_resume, document_content FROM documents WHERE user_id = ? ORDER BY upload_date DESC", 
                 conn, params=(user_id,)
             )
             conn.close()
@@ -359,5 +469,44 @@ def show_user_portal():
                             st.rerun()
                         else:
                             st.error(message)
+            # Document Content Viewer Section
+            st.markdown("---")
+            st.subheader("👁️ View Document Content")
+            
+            # Document selector for viewing content
+            if not documents_df.empty:
+                doc_names = [f"{row['document_name']} ({row['document_type']})" for _, row in documents_df.iterrows()]
+                doc_ids = documents_df['id'].tolist()
+                
+                selected_doc_index = st.selectbox(
+                    "Select document to view:",
+                    range(len(doc_names)),
+                    format_func=lambda x: doc_names[x]
+                )
+                
+                if selected_doc_index is not None:
+                    selected_doc_id = doc_ids[selected_doc_index]
+                    selected_doc = documents_df[documents_df['id'] == selected_doc_id].iloc[0]
+                    
+                    # Display document content from database
+                    with st.expander(f"📄 {selected_doc['document_name']} Content", expanded=True):
+                        if pd.notna(selected_doc['document_content']) and selected_doc['document_content']:
+                            st.text_area(
+                                "Document Content (stored in database)",
+                                value=selected_doc['document_content'],
+                                height=400,
+                                disabled=True,
+                                key=f"content_viewer_{selected_doc_id}"
+                            )
+                            
+                            # Show content stats
+                            content_length = len(selected_doc['document_content'])
+                            word_count = len(selected_doc['document_content'].split())
+                            st.caption(f"📊 Content Stats: {content_length:,} characters, ~{word_count:,} words")
+                            
+                        else:
+                            st.warning("⚠️ No content stored in database for this document.")
+                            st.info("💡 This document was uploaded before content storage was implemented. Try re-uploading to store content.")
+                            
         else:
             st.info("📝 No documents uploaded yet. Upload your first document above!")

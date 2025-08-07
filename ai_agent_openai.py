@@ -254,6 +254,10 @@ class OpenAIJobAgent:
     def _extract_text_from_file(self, file_path: str) -> str:
         """Extract text from document file."""
         try:
+            # Check if file exists first
+            if not os.path.exists(file_path):
+                return f"File not found: {file_path}. This might be a cloud deployment issue where local files aren't available."
+            
             if file_path.endswith('.pdf'):
                 reader = PdfReader(file_path)
                 text = ""
@@ -269,7 +273,7 @@ class OpenAIJobAgent:
             else:
                 return "Unsupported file format"
         except Exception as e:
-            return f"Error reading file: {str(e)}"
+            return f"Error reading file: {str(e)}. This might be due to file corruption or cloud deployment limitations."
     
     def _analyze_job(self, job_id: int) -> str:
         """Analyze a job posting and return key insights."""
