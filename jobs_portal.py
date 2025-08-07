@@ -360,9 +360,16 @@ def show_jobs_portal():
         # Show Parse with AI button if we have content (but no AI analysis yet)
         if st.session_state.firecrawl_job_description and not st.session_state.firecrawl_ai_analysis:
             if st.button("🤖 Parse with AI", key="firecrawl_parse_ai"):
+                # Debug: Check what content we have
+                content_length = len(st.session_state.firecrawl_job_description or "")
+                st.write(f"🔍 Debug - Content length: {content_length}")
+                
                 with st.spinner("Analyzing content with AI..."):
                     # Get AI analysis using the existing function
                     ai_analysis = scraper_openai_agent(st.session_state.firecrawl_job_description)
+                    
+                    # Debug: Check AI response
+                    st.write(f"🔍 Debug - AI response preview: {str(ai_analysis)[:150]}...")
                     
                     # Display AI analysis
                     st.subheader("🤖 AI Analysis")
