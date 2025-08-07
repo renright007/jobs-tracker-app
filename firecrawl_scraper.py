@@ -173,9 +173,9 @@ def scraper_openai_agent(text: str) -> str:
     if client is None:
         return json.dumps({"error": "OpenAI client initialization failed. Please check your API key configuration."})
     
-    # Define the prompt and system message
+    # Define the prompt and system message template
     prompt = "Please help me extract the information from the text the unstructured text provided."
-    system_message = f"""
+    system_message_template = """
     You are an intelligent extraction agent. Given a snippet of **text**, scrape detailed information about the relevant below information:
         - Company Name
         - Job Title
@@ -196,7 +196,8 @@ def scraper_openai_agent(text: str) -> str:
     """
     
     try:
-        # Generate AI response using OpenAI API
+        # Generate AI response using OpenAI API with properly inserted scraped content
+        system_message = system_message_template.format(text=text)
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
