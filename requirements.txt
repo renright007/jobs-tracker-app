@@ -31,4 +31,5 @@ supabase==2.7.0
 # 🌐 Web Scraping
 selenium==4.15.0
 webdriver-manager==4.0.1
+firecrawl-py==0.0.16
 

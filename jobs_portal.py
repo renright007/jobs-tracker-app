@@ -4,6 +4,7 @@ from datetime import datetime
 from utils import get_db_connection, init_db, ensure_directories
 from streamlit_shadcn_ui import tabs
 from selenium_scraper import open_webpage, get_longest_text_content, scraper_openai_agent, save_job_to_database
+from firecrawl_scraper import scrape_job_with_firecrawl, is_firecrawl_available
 
 import json
 import time
@@ -284,26 +285,88 @@ def show_jobs_portal():
                         "application_status": application_status
                     }
                     
-                    # Open the webpage
-                    driver = open_webpage(job_url)
-                    if driver:
-                        try:
-                            # Get the longest text content (likely job description)
-                            longest_text = get_longest_text_content(driver)
+                    # Try Firecrawl first (cloud-compatible)
+                    if is_firecrawl_available():
+                        st.info("🔥 Using Firecrawl API for scraping (cloud-compatible)")
+                        result = scrape_job_with_firecrawl(job_url)
+                        
+                        if result.get("success"):
+                            # Extract content and AI analysis
+                            data = result.get("data", {})
+                            scraped_content = data.get("scraped_content", "")
                             
-                            if longest_text and longest_text["text"]:
+                            if scraped_content:
                                 # Store in session state for AI parsing
-                                st.session_state.job_description = longest_text["text"]
+                                st.session_state.job_description = scraped_content
                                 
                                 # Display the scraped content
                                 st.subheader("Scraped Content")
-                                st.text_area("Job Description", value=longest_text["text"], height=300)
+                                st.text_area("Job Description", value=scraped_content, height=300)
+                                
+                                # If AI extraction was already done, show it
+                                if "company_name" in data:
+                                    st.session_state.ai_analysis = {
+                                        'company_name': data.get('company_name', ''),
+                                        'job_title': data.get('job_title', ''),
+                                        'job_description': data.get('job_description', scraped_content),
+                                        'application_url': job_url,
+                                        'status': 'Not Applied',
+                                        'sentiment': 'Neutral',
+                                        'location': data.get('job_location', 'Not Listed'),
+                                        'salary': data.get('job_salary', 'Not Listed'),
+                                        'applied_date': '',
+                                        'notes': ''
+                                    }
+                                    st.success("🤖 AI extraction completed automatically!")
                             else:
-                                st.error("Could not find job description. Please check the URL and try again.")
-                        finally:
-                            driver.quit()
+                                st.error("Could not extract content from the webpage. Please check the URL and try again.")
+                        else:
+                            error = result.get("error", "Unknown error")
+                            st.error(f"❌ Firecrawl scraping failed: {error}")
+                            st.info("💡 Trying backup Selenium scraper...")
+                            
+                            # Fallback to Selenium
+                            driver = open_webpage(job_url)
+                            if driver:
+                                try:
+                                    # Get the longest text content (likely job description)
+                                    longest_text = get_longest_text_content(driver)
+                                    
+                                    if longest_text and longest_text["text"]:
+                                        # Store in session state for AI parsing
+                                        st.session_state.job_description = longest_text["text"]
+                                        
+                                        # Display the scraped content
+                                        st.subheader("Scraped Content (Selenium Fallback)")
+                                        st.text_area("Job Description", value=longest_text["text"], height=300)
+                                    else:
+                                        st.error("Could not find job description with fallback method either.")
+                                finally:
+                                    driver.quit()
+                            else:
+                                st.error("Both Firecrawl and Selenium scraping failed. Please check the URL.")
                     else:
-                        st.error("Failed to open the webpage. Please check the URL and try again.")
+                        # Firecrawl not available, use Selenium
+                        st.info("🔧 Using Selenium for scraping (local only)")
+                        driver = open_webpage(job_url)
+                        if driver:
+                            try:
+                                # Get the longest text content (likely job description)
+                                longest_text = get_longest_text_content(driver)
+                                
+                                if longest_text and longest_text["text"]:
+                                    # Store in session state for AI parsing
+                                    st.session_state.job_description = longest_text["text"]
+                                    
+                                    # Display the scraped content
+                                    st.subheader("Scraped Content")
+                                    st.text_area("Job Description", value=longest_text["text"], height=300)
+                                else:
+                                    st.error("Could not find job description. Please check the URL and try again.")
+                            finally:
+                                driver.quit()
+                        else:
+                            st.error("Failed to open the webpage. Please check the URL and try again.")
         
         # Show Parse with AI button if we have content
         if st.session_state.job_description:
