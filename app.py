@@ -263,7 +263,7 @@ def create_logo_section():
         with col2:
             logo_path = "assets/RLE - Logo 2.0 White.png"
             if os.path.exists(logo_path):
-                st.image(logo_path, width=200, use_column_width="auto")
+                st.image(logo_path, width=200, use_container_width=True)
             else:
                 st.error(f"Logo file not found at {logo_path}")
         st.markdown("---")  # Add a horizontal line after the logo
