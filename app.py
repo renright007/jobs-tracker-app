@@ -222,7 +222,6 @@ def main():
 
 def show_login_prompt():
     """Show login prompt for unauthenticated users."""
-    st.title("Welcome to Jobs Organiser")
     st.info("👋 Please log in to access this feature")
     
     # Import the login functionality
