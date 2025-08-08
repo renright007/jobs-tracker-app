@@ -2,7 +2,12 @@ import streamlit as st
 import openai
 
 # Set page config to wide layout - must be first Streamlit command
-st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",
+    page_title="Jobs Organiser",
+    page_icon="./assets/RLE - Logo.png",
+    initial_sidebar_state="expanded"
+)
 
 # Now import other modules
 from streamlit_option_menu import option_menu
