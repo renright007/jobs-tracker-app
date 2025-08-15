@@ -135,6 +135,10 @@ def show_openai_chatbot():
                         input_text = "Application Strategy:"
                         response_text = agent.chat(prompt)
                 
+                if st.button("📄 Tailor Resume", key="openai_tailor_resume_btn"):
+                    with st.spinner("Tailoring your resume..."):
+                        input_text, response_text = _tailor_resume_for_job(agent, selected_job_id, selected_job_data)
+                
                 if st.button("💡 Match my skills to this job", key="openai_skills_match_btn"):
                     prompt = f"Analyze how well my skills match job ID {selected_job_id} and suggest areas for improvement."
                     with st.spinner("Analyzing skill match..."):
@@ -164,6 +168,32 @@ def show_openai_chatbot():
             # Show the response in a text area if an action was taken
             if input_text and response_text:
                 st.text_area(input_text, response_text, height=500)
+                
+                # Add download button if this is a tailored resume
+                if input_text == "Tailored Resume:" and 'tailored_resume' in st.session_state:
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        job_name = st.session_state.get('tailored_resume_job', 'Unknown_Job')
+                        # Clean job name for filename
+                        safe_job_name = "".join(c for c in job_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                        safe_job_name = safe_job_name.replace(' ', '_')
+                        filename = f"Tailored_Resume_{safe_job_name}.txt"
+                        
+                        st.download_button(
+                            label="📥 Download Tailored Resume",
+                            data=st.session_state['tailored_resume'],
+                            file_name=filename,
+                            mime="text/plain",
+                            key="download_tailored_resume"
+                        )
+                    
+                    with col2:
+                        if st.button("🗑️ Clear Resume", key="clear_tailored_resume"):
+                            if 'tailored_resume' in st.session_state:
+                                del st.session_state['tailored_resume']
+                            if 'tailored_resume_job' in st.session_state:
+                                del st.session_state['tailored_resume_job']
+                            st.rerun()
         
         else:
             st.info("No jobs found. Add some jobs in the Job Portal to get started!")
@@ -269,3 +299,104 @@ def _show_basic_openai_chatbot():
 def show_ai_chatbot_openai():
     """Alternative entry point for the OpenAI chatbot implementation."""
     return show_openai_chatbot()
+
+
+def _tailor_resume_for_job(agent, selected_job_id, selected_job_data):
+    """
+    Tailor a user's resume for a specific job using AI.
+    
+    Args:
+        agent: The OpenAIJobAgent instance
+        selected_job_id: ID of the selected job
+        selected_job_data: Job data dictionary
+    
+    Returns:
+        tuple: (input_text, response_text) for display
+    """
+    from database_utils import get_preferred_resume
+    
+    try:
+        user_id = st.session_state.get('user_id')
+        
+        # Validate user is authenticated
+        if not user_id:
+            return ("Error:", "❌ User not authenticated. Please log in first.")
+        
+        # Get user's preferred resume
+        resume_data = get_preferred_resume(user_id)
+        
+        if resume_data is None or resume_data.empty:
+            return ("Error:", "❌ No preferred resume found. Please upload and set a preferred resume in the User Portal first.\n\nℹ️ To set a preferred resume:\n1. Go to User Portal\n2. Upload a resume\n3. Mark it as preferred (⭐)")
+        
+        resume_content = resume_data.iloc[0]['document_content'] if not resume_data.empty else ''
+        if not resume_content or len(resume_content.strip()) < 50:
+            return ("Error:", "❌ Resume content is too short or empty. Please re-upload your resume with proper content.")
+        
+        # Get job description and validate
+        job_description = selected_job_data['job_description'] if 'job_description' in selected_job_data else ''
+        if not job_description or len(job_description.strip()) < 100:
+            return ("Error:", "❌ Job description is missing or too short. Please ensure the job has a complete, detailed description.\n\nℹ️ Try using the job scraper to get a full description.")
+        
+        # Validate resume and job description lengths for API limits
+        total_length = len(resume_content) + len(job_description)
+        if total_length > 50000:  # Conservative limit for API
+            return ("Error:", "❌ Resume and job description are too long for processing. Please use a shorter resume or job description.")
+        
+        # Create the tailoring prompt
+        tailor_prompt = _create_resume_tailor_prompt(resume_content, job_description)
+        
+        # Get AI response with error handling
+        try:
+            response = agent.chat(tailor_prompt)
+        except Exception as api_error:
+            if "rate limit" in str(api_error).lower():
+                return ("Error:", "❌ API rate limit exceeded. Please wait a moment and try again.")
+            elif "token" in str(api_error).lower():
+                return ("Error:", "❌ Content too long for processing. Please use a shorter resume or job description.")
+            else:
+                return ("Error:", f"❌ AI processing failed: {str(api_error)}")
+        
+        # Validate response
+        if not response or len(response.strip()) < 100:
+            return ("Error:", "❌ AI generated an incomplete response. Please try again.")
+        
+        # Store the tailored resume in session state for download
+        st.session_state['tailored_resume'] = response
+        st.session_state['tailored_resume_job'] = f"{selected_job_data['company_name']} - {selected_job_data['job_title']}"
+        
+        return ("Tailored Resume:", response)
+        
+    except Exception as e:
+        # Log the error for debugging (you can add logging here if needed)
+        return ("Error:", f"❌ Unexpected error occurred: {str(e)}\n\nPlease try again or contact support if the problem persists.")
+
+
+def _create_resume_tailor_prompt(resume, job_description):
+    """
+    Create the resume tailoring prompt with the user's specifications.
+    
+    Args:
+        resume: The user's resume content
+        job_description: The job description to tailor for
+    
+    Returns:
+        str: The complete prompt for AI processing
+    """
+    return f"""You are a professional resume writer. I need you to tailor my resume for a specific job posting.
+
+TASK: Rewrite my resume to be optimized for the job description below and make it ATS friendly.
+
+REQUIREMENTS:
+1. Incorporate relevant keywords and skills from the job description naturally
+2. Highlight my most relevant achievements and experiences for this role
+3. Maintain accuracy and honesty in all details
+4. Use a clear, ATS-friendly format with no graphics, tables, or unusual formatting
+5. Keep professional language and 1-2 pages in length
+
+MY CURRENT RESUME:
+{resume}
+
+JOB DESCRIPTION TO TAILOR FOR:
+{job_description}
+
+OUTPUT: Please provide the complete tailored resume, formatted professionally and ready to use. Start immediately with the tailored resume content."""

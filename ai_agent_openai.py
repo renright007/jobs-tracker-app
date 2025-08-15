@@ -754,21 +754,21 @@ Remember: You're not just answering questions - you're helping the user succeed 
                 supabase = get_supabase_client()
                 
                 if self.user_id:
-                    result = supabase.table('jobs').select('id, company_name, job_title, status, date_added').eq('user_id', self.user_id).order('date_added', desc=True).execute()
+                    result = supabase.table('jobs').select('id, company_name, job_title, job_description, status, date_added').eq('user_id', self.user_id).order('date_added', desc=True).execute()
                 else:
-                    result = supabase.table('jobs').select('id, company_name, job_title, status, date_added').order('date_added', desc=True).execute()
+                    result = supabase.table('jobs').select('id, company_name, job_title, job_description, status, date_added').order('date_added', desc=True).execute()
                 
                 return pd.DataFrame(result.data) if result.data else pd.DataFrame()
             else:
                 conn = get_db_connection()
                 if self.user_id:
                     jobs_df = pd.read_sql_query(
-                        "SELECT id, company_name, job_title, status, date_added FROM jobs WHERE user_id = ? ORDER BY date_added DESC",
+                        "SELECT id, company_name, job_title, job_description, status, date_added FROM jobs WHERE user_id = ? ORDER BY date_added DESC",
                         conn, params=(self.user_id,)
                     )
                 else:
                     jobs_df = pd.read_sql_query(
-                        "SELECT id, company_name, job_title, status, date_added FROM jobs ORDER BY date_added DESC",
+                        "SELECT id, company_name, job_title, job_description, status, date_added FROM jobs ORDER BY date_added DESC",
                         conn
                     )
                 conn.close()

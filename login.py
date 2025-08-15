@@ -310,7 +310,7 @@ def show_login_page():
         st.session_state.username = None
     
     # Create tabs using streamlit_shadcn_ui
-    tab_options = ["Login", "Register", "Existing Users"]
+    tab_options = ["Login", "Register"]
     selected_tab = tabs(options=tab_options, default_value="Login")
     
     if selected_tab == "Login":
@@ -358,31 +358,6 @@ def show_login_page():
                         #st.rerun()  # Refresh the page after successful registration
                     else:
                         st.error(message)
-    
-    else:  # Existing Users tab
-        st.subheader("Existing Users")
-        try:
-            users_df = get_existing_users()
-            if not users_df.empty:
-                # Create a form for the data editor
-                with st.form("users_database_form"):
-                    edited_df = st.data_editor(
-                        users_df,
-                        hide_index=True,
-                        num_rows="dynamic"
-                    )
-                    if st.form_submit_button("Save Changes", use_container_width=True):
-                        success, message = save_users_to_database(edited_df)
-                        if success:
-                            st.success(message)
-                            st.rerun()  # Refresh to show updated data
-                        else:
-                            st.error(message)
-            else:
-                st.info("No users have registered yet.")
-        except Exception as e:
-            st.error(f"Error loading users: {str(e)}")
-            st.write("Debug info:", e.__class__.__name__)  # Show the type of error
 
 def logout():
     """Logout the current user."""
