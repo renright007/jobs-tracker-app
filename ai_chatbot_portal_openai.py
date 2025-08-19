@@ -378,17 +378,32 @@ def _create_resume_tailor_prompt(resume, job_description):
     """
     return f"""You are a professional resume writer. I need you to tailor my resume for a specific job posting.
 
+CRITICAL REQUIREMENTS - READ CAREFULLY:
+🚨 PRESERVE ALL CONTENT: You must maintain the FULL LENGTH and ALL DETAILS of every experience, achievement, and role.
+🚨 NO SHORTENING: Do not remove, shorten, condense, or summarize ANY existing content.
+🚨 EXPAND WHEN POSSIBLE: If anything can be made more detailed or comprehensive, DO IT.
+🚨 LONGER IS BETTER: A longer, more detailed resume is always preferable to a shorter one.
+
 TASK: Take my resume and the provided job description. Analyze the job description to extract the most important skills, tools, and keywords likely prioritized by both the Applicant Tracking System (ATS) and the hiring manager.
 
 Tailor my resume as follows:
-1. Keep all existing experiences, achievements, and roles intact — do not remove, shorten, or condense anything. Add any skills listed in the description to the skills section and arrange them in a logical order.
-2. Adapt the language in my experiences so they clearly align with the skills, tools, and software mentioned in the job description.
-3. Incorporate relevant keywords naturally throughout the resume.
-4. Update the Skills section to include any additional relevant skills, tools, or software mentioned in the job description that I have experience with.
-5. Use a clear, ATS-friendly format with no graphics, tables, or unusual formatting.
-6. Maintain professional language throughout.
+1. 🔒 PRESERVE EVERYTHING: Keep every single word of all existing experiences, achievements, and roles. Do not remove, shorten, edit down, or condense ANYTHING from the original content.
+2. ➕ ENHANCE & EXPAND: Add more detail to existing bullet points where relevant. Make descriptions longer and more comprehensive.
+3. 🎯 OPTIMIZE LANGUAGE: Adapt and enhance the language in my experiences to align with the job description keywords while keeping all original content.
+4. 📝 ADD SKILLS: Add any relevant skills from the job description to the skills section and arrange them logically.
+5. 🔧 ATS OPTIMIZATION: Incorporate relevant keywords naturally throughout the resume without removing existing content.
+6. 📄 PROFESSIONAL FORMAT: Use a clear, ATS-friendly format with no graphics, tables, or unusual formatting.
 
-OUTPUT: Please provide the complete tailored resume, formatted professionally and ready to use. Start immediately with the tailored resume content. DO NOT REMOVE ANY TEXT FROM MY CAREER EXPERIENCE SECTION
+ABSOLUTELY FORBIDDEN:
+❌ Do NOT remove any bullet points
+❌ Do NOT shorten any descriptions  
+❌ Do NOT condense multiple points into fewer points
+❌ Do NOT eliminate any achievements or experiences
+❌ Do NOT make the resume shorter in any way
+
+FINAL REMINDER: The goal is to ENHANCE and EXPAND the resume while maintaining every single detail from the original. When in doubt, make it longer and more detailed, never shorter.
+
+OUTPUT: Provide the complete tailored resume, formatted professionally and ready to use. Start immediately with the tailored resume content.
 
 Here is my resume:
 {resume}

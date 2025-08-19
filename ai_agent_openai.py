@@ -286,7 +286,7 @@ class OpenAIJobAgent:
         
         # Create detailed prompt for job analysis
         prompt = f"""
-You are an expert career strategist and job market analyst. Provide a comprehensive analysis of this job opportunity for Robert Enright, considering both the role requirements and his background.
+You are an expert career strategist and job market analyst. Provide a comprehensive analysis of this job opportunity for the user, considering both the role requirements and their background.
 
 **JOB DETAILS:**
 - Company: {job['company_name']}
@@ -295,7 +295,7 @@ You are an expert career strategist and job market analyst. Provide a comprehens
 - Location: {job.get('location', 'Not specified')}
 - Salary: {job.get('salary', 'Not specified')}
 
-**ROBERT'S RESUME:**
+**USER'S RESUME:**
 {resume_data}
 
 **COMPREHENSIVE JOB ANALYSIS:**
@@ -318,15 +318,15 @@ You are an expert career strategist and job market analyst. Provide a comprehens
    - Work culture and environment indicators
    - Career development and learning opportunities
 
-4. **Robert's Fit Assessment (0-100% match)**:
+4. **Candidate Fit Assessment (0-100% match)**:
    - Overall compatibility score with reasoning
    - Strengths that align perfectly with requirements
-   - Areas where Robert exceeds expectations
+   - Areas where the candidate exceeds expectations
    - Experience gaps or potential concerns
 
 5. **Application Strategy Recommendations**:
    - Key selling points to emphasize in application
-   - How to position Robert's unique value proposition
+   - How to position the candidate's unique value proposition
    - Potential objections to address proactively
    - Timeline and next steps for application
 
@@ -334,15 +334,15 @@ You are an expert career strategist and job market analyst. Provide a comprehens
    - Most likely interview questions and topics
    - Technical areas to review and practice
    - Company research focus areas
-   - Questions Robert should prepare to ask
+   - Questions the candidate should prepare to ask
 
 7. **Decision Factors**:
-   - Pros and cons of this opportunity for Robert's career
-   - How this role fits into his career trajectory
+   - Pros and cons of this opportunity for the candidate's career
+   - How this role fits into their career trajectory
    - Potential red flags or concerns to investigate
    - Alternative approaches if not selected
 
-Provide specific, actionable insights that will help Robert make an informed decision about pursuing this opportunity and optimize his approach if he decides to apply.
+Provide specific, actionable insights that will help the candidate make an informed decision about pursuing this opportunity and optimize their approach if they decide to apply.
         """
         
         try:
@@ -381,7 +381,7 @@ Provide specific, actionable insights that will help Robert make an informed dec
         
         # Create detailed prompt for application strategy
         prompt = f"""
-You are an expert career strategist and application optimization specialist. Create a comprehensive, step-by-step application strategy for Robert Enright for this specific job opportunity.
+You are an expert career strategist and application optimization specialist. Create a comprehensive, step-by-step application strategy for the user for this specific job opportunity.
 
 **JOB DETAILS:**
 - Company: {job['company_name']}
@@ -390,7 +390,7 @@ You are an expert career strategist and application optimization specialist. Cre
 - Location: {job.get('location', 'Not specified')}
 - Salary: {job.get('salary', 'Not specified')}
 
-**ROBERT'S RESUME:**
+**USER'S RESUME:**
 {resume_data}
 
 **COMPREHENSIVE APPLICATION STRATEGY:**
@@ -452,7 +452,7 @@ You are an expert career strategist and application optimization specialist. Cre
    - Week 3-4: Continued networking and follow-up activities
    - Contingency planning for different response scenarios
 
-Provide specific, actionable steps that Robert can execute immediately to maximize his chances of success with this application.
+Provide specific, actionable steps that the user can execute immediately to maximize their chances of success with this application.
         """
         
         try:
@@ -541,7 +541,7 @@ Provide specific, actionable steps that Robert can execute immediately to maximi
         
         # Create detailed prompt for AI cover letter generation
         prompt = f"""
-You are writing a personalized cover letter for Robert Enright. Follow his specific preferences exactly.
+You are writing a personalized cover letter for the user. Follow their specific preferences exactly.
 
 **JOB DETAILS:**
 - Company: {job['company_name']}
@@ -549,20 +549,20 @@ You are writing a personalized cover letter for Robert Enright. Follow his speci
 - Job Description: {job.get('job_description', 'No description available')}
 - Location: {job.get('location', 'Not specified')}
 
-**ROBERT'S COVER LETTER PREFERENCES:**
+**USER'S COVER LETTER PREFERENCES:**
 {preferences}
 
-**ROBERT'S BACKGROUND (for context):**
+**USER'S BACKGROUND (for context):**
 {resume_data}
 
 **INSTRUCTIONS:**
-1. Write a complete, polished cover letter following Robert's preferences exactly
-2. Use the conversational, human tone he prefers - not overly formal or AI-sounding
-3. Follow the 5-paragraph structure he outlined
+1. Write a complete, polished cover letter following the user's preferences exactly
+2. Use the conversational, human tone they prefer - not overly formal or AI-sounding
+3. Follow the 5-paragraph structure they outlined
 4. Keep to 350-400 words maximum
-5. Use em dashes and his preferred punctuation style
+5. Use em dashes and their preferred punctuation style
 6. Avoid corporate speak, buzzwords, and passive language
-7. Make specific connections between his experience and this role
+7. Make specific connections between their experience and this role
 8. Research and reference something specific about the company/role
 9. End with a sincere, confident closing (not robotic)
 
@@ -605,7 +605,7 @@ Write the cover letter now - provide only the letter content, no additional note
         
         # Create detailed prompt for skills matching analysis
         prompt = f"""
-You are an expert career advisor and skills assessment specialist. Conduct a comprehensive analysis of how well Robert Enright's background matches the requirements for this specific position.
+You are an expert career advisor and skills assessment specialist. Conduct a comprehensive analysis of how well the user's background matches the requirements for this specific position.
 
 **JOB DETAILS:**
 - Company: {job['company_name']}
@@ -614,7 +614,7 @@ You are an expert career advisor and skills assessment specialist. Conduct a com
 - Location: {job.get('location', 'Not specified')}
 - Salary: {job.get('salary', 'Not specified')}
 
-**ROBERT'S RESUME:**
+**USER'S RESUME:**
 {resume_data}
 
 **ANALYSIS REQUIRED:**
@@ -623,40 +623,40 @@ You are an expert career advisor and skills assessment specialist. Conduct a com
 
 2. **Technical Skills Analysis**:
    - List required technical skills from the job posting
-   - Match each requirement to Robert's experience (Strong Match/Partial Match/Missing)
-   - Highlight relevant technologies, tools, and software Robert knows
+   - Match each requirement to the user's experience (Strong Match/Partial Match/Missing)
+   - Highlight relevant technologies, tools, and software the user knows
 
 3. **Experience Level Comparison**:
-   - Compare years of experience required vs. Robert's background
+   - Compare years of experience required vs. the user's background
    - Assess seniority level match (entry/mid/senior)
    - Evaluate industry experience relevance
 
 4. **Key Strengths for This Role**:
-   - Top 5 strengths from Robert's background that align perfectly
+   - Top 5 strengths from the user's background that align perfectly
    - Specific examples and achievements that demonstrate these strengths
    - Quantifiable results and impacts
 
 5. **Skill Gaps & Development Areas**:
    - Missing skills or technologies mentioned in the job posting
-   - Areas where Robert could strengthen his profile
+   - Areas where the user could strengthen their profile
    - Suggested learning priorities (ranked by importance)
 
 6. **Competitive Advantages**:
-   - Unique aspects of Robert's background that stand out
+   - Unique aspects of the user's background that stand out
    - Cross-functional skills that add value
    - Leadership, project management, or specialized experience
 
 7. **Application Strategy Recommendations**:
-   - How to position Robert's experience in the application
+   - How to position the user's experience in the application
    - Key selling points to emphasize in cover letter/interview
    - Potential concerns to address proactively
 
 8. **Interview Preparation Focus**:
    - Technical areas to review before the interview
    - Experience examples to prepare and practice
-   - Questions Robert should ask to demonstrate fit
+   - Questions the user should ask to demonstrate fit
 
-Provide specific, actionable insights that will help Robert understand his competitive position and optimize his application strategy.
+Provide specific, actionable insights that will help the user understand their competitive position and optimize their application strategy.
         """
         
         try:
@@ -695,7 +695,7 @@ Provide specific, actionable insights that will help Robert understand his compe
         
         # Create detailed prompt for interview preparation
         prompt = f"""
-You are an expert interview coach and career strategist. Create a comprehensive interview preparation guide for Robert Enright based on his specific background and this job opportunity.
+You are an expert interview coach and career strategist. Create a comprehensive interview preparation guide for the user based on their specific background and this job opportunity.
 
 **JOB DETAILS:**
 - Company: {job['company_name']}
@@ -704,7 +704,7 @@ You are an expert interview coach and career strategist. Create a comprehensive 
 - Location: {job.get('location', 'Not specified')}
 - Salary: {job.get('salary', 'Not specified')}
 
-**ROBERT'S RESUME:**
+**USER'S RESUME:**
 {resume_data}
 
 **COMPREHENSIVE INTERVIEW PREPARATION GUIDE:**
@@ -713,14 +713,14 @@ You are an expert interview coach and career strategist. Create a comprehensive 
    - Technical questions based on job requirements
    - Behavioral questions relevant to the role
    - Situational questions testing problem-solving
-   - Questions about Robert's specific experience and background
+   - Questions about the user's specific experience and background
 
 2. **Prepared Response Framework**:
    For each question, provide:
-   - Key points Robert should cover
-   - Specific examples from his experience to mention
+   - Key points the user should cover
+   - Specific examples from their experience to mention
    - Quantifiable achievements to highlight
-   - How to connect his background to their needs
+   - How to connect their background to the company's needs
 
 3. **Technical Deep-Dive Areas**:
    - Technologies/tools they'll likely test knowledge on
@@ -734,7 +734,7 @@ You are an expert interview coach and career strategist. Create a comprehensive 
    - Include specific metrics and outcomes
    - Cover different aspects: leadership, problem-solving, collaboration, innovation
 
-5. **Questions Robert Should Ask**:
+5. **Questions the User Should Ask**:
    - About the role and day-to-day responsibilities
    - About team structure and collaboration
    - About company culture and growth opportunities
@@ -744,13 +744,13 @@ You are an expert interview coach and career strategist. Create a comprehensive 
 6. **Company-Specific Talking Points**:
    - Recent company news or developments to reference
    - Company values and culture alignment
-   - How Robert's experience relates to their business
-   - Why he's specifically interested in this company
+   - How the user's experience relates to their business
+   - Why they're specifically interested in this company
 
 7. **Potential Concerns & How to Address**:
    - Any gaps in experience and how to position them
    - Career transitions or changes to explain
-   - Why he's leaving current role (if applicable)
+   - Why they're leaving current role (if applicable)
    - Salary expectations and negotiation talking points
 
 8. **Interview Day Strategy**:
@@ -759,7 +759,7 @@ You are an expert interview coach and career strategist. Create a comprehensive 
    - Follow-up questions to demonstrate engagement
    - Closing statements that reinforce fit
 
-Focus on practical, actionable guidance that Robert can use to confidently navigate the interview and demonstrate his value as a candidate.
+Focus on practical, actionable guidance that the user can use to confidently navigate the interview and demonstrate their value as a candidate.
         """
         
         try:
