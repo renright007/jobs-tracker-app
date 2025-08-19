@@ -4,7 +4,7 @@ from utils import init_openai_client
 
 # OpenAI agent imports
 try:
-    from ai_agent_openai import OpenAIJobAgent, get_openai_prompt_template, OPENAI_COMMON_PROMPTS
+    from ai_agent_openai import OpenAIJobAgent
     OPENAI_AGENT_AVAILABLE = True
 except ImportError as e:
     st.error(f"OpenAI agent not available: {str(e)}")
@@ -124,46 +124,40 @@ def show_openai_chatbot():
             
             with col1:
                 if st.button("📊 Analyze this job", key="openai_analyze_selected_btn"):
-                    prompt = get_openai_prompt_template('analyze_job', job_id=selected_job_id)
                     with st.spinner("Analyzing job..."):
                         input_text = "Job Analysis:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._analyze_job(selected_job_id)
                 
                 if st.button("🎯 Help me apply to this job", key="openai_apply_selected_btn"):
-                    prompt = get_openai_prompt_template('help_apply', job_id=selected_job_id)
                     with st.spinner("Creating application strategy..."):
                         input_text = "Application Strategy:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._help_apply(selected_job_id)
                 
                 if st.button("📄 Tailor Resume", key="openai_tailor_resume_btn"):
                     with st.spinner("Tailoring your resume..."):
                         input_text, response_text = _tailor_resume_for_job(agent, selected_job_id, selected_job_data)
                 
                 if st.button("💡 Match my skills to this job", key="openai_skills_match_btn"):
-                    prompt = f"Analyze how well my skills match job ID {selected_job_id} and suggest areas for improvement."
                     with st.spinner("Analyzing skill match..."):
                         input_text = "Skill Analysis:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._match_skills(selected_job_id)
             
             with col2:
                 if st.button("🏢 Research this company", key="openai_research_selected_btn"):
                     company = selected_job_data['company_name']
-                    prompt = get_openai_prompt_template('research_company', company_name=company)
                     with st.spinner("Researching company..."):
                         input_text = "Company Research:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._research_company(company)
                 
                 if st.button("📝 Generate cover letter", key="openai_cover_letter_btn"):
-                    prompt = f"Generate a personalized cover letter for job ID {selected_job_id} at {selected_job_data['company_name']}."
                     with st.spinner("Writing cover letter..."):
                         input_text = "Cover Letter:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._generate_cover_letter(selected_job_id)
                 
                 if st.button("🔍 Suggest interview questions", key="openai_interview_questions_btn"):
-                    prompt = f"What interview questions should I prepare for job ID {selected_job_id} at {selected_job_data['company_name']}?"
                     with st.spinner("Preparing questions..."):
                         input_text = "Interview Questions:"
-                        response_text = agent.chat(prompt)
+                        response_text = agent._prepare_interview(selected_job_id, selected_job_data['company_name'])
 
             # Show the response in a text area if an action was taken
             if input_text and response_text:
@@ -384,19 +378,22 @@ def _create_resume_tailor_prompt(resume, job_description):
     """
     return f"""You are a professional resume writer. I need you to tailor my resume for a specific job posting.
 
-TASK: Rewrite my resume to be optimized for the job description below and make it ATS friendly.
+TASK: Take my resume and the provided job description. Analyze the job description to extract the most important skills, tools, and keywords likely prioritized by both the Applicant Tracking System (ATS) and the hiring manager.
 
-REQUIREMENTS:
-1. Incorporate relevant keywords and skills from the job description naturally
-2. Highlight my most relevant achievements and experiences for this role
-3. Maintain accuracy and honesty in all details
-4. Use a clear, ATS-friendly format with no graphics, tables, or unusual formatting
-5. Keep professional language and 1-2 pages in length
+Tailor my resume as follows:
+1. Keep all existing experiences, achievements, and roles intact — do not remove, shorten, or condense anything. Add any skills listed in the description to the skills section and arrange them in a logical order.
+2. Adapt the language in my experiences so they clearly align with the skills, tools, and software mentioned in the job description.
+3. Incorporate relevant keywords naturally throughout the resume.
+4. Update the Skills section to include any additional relevant skills, tools, or software mentioned in the job description that I have experience with.
+5. Use a clear, ATS-friendly format with no graphics, tables, or unusual formatting.
+6. Maintain professional language throughout.
 
-MY CURRENT RESUME:
+OUTPUT: Please provide the complete tailored resume, formatted professionally and ready to use. Start immediately with the tailored resume content. DO NOT REMOVE ANY TEXT FROM MY CAREER EXPERIENCE SECTION
+
+Here is my resume:
 {resume}
 
 JOB DESCRIPTION TO TAILOR FOR:
 {job_description}
 
-OUTPUT: Please provide the complete tailored resume, formatted professionally and ready to use. Start immediately with the tailored resume content."""
+"""

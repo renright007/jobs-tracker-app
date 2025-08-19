@@ -281,62 +281,204 @@ class OpenAIJobAgent:
         if not job:
             return f"No job found with ID {job_id}"
         
-        # Extract key information using simple pattern matching
-        job_description = job['job_description']
+        # Get user's resume data for context
+        resume_data = self._get_user_resume()
         
-        # Extract skills
-        skill_keywords = [
-            'python', 'java', 'javascript', 'react', 'node.js', 'sql', 'postgresql', 
-            'mysql', 'mongodb', 'aws', 'azure', 'gcp', 'docker', 'kubernetes',
-            'git', 'agile', 'scrum', 'jira', 'excel', 'tableau', 'power bi'
-        ]
-        
-        found_skills = []
-        description_lower = job_description.lower()
-        for skill in skill_keywords:
-            if skill in description_lower:
-                found_skills.append(skill.title())
-        
-        # Extract experience requirements
-        experience_patterns = [
-            r'(\d+\+?\s*years?\s*(?:of\s*)?experience)',
-            r'(bachelor\'?s?\s*degree)',
-            r'(master\'?s?\s*degree)',
-        ]
-        
-        requirements = []
-        for pattern in experience_patterns:
-            matches = re.findall(pattern, description_lower)
-            requirements.extend([match.strip() for match in matches[:2]])
-        
-        # Determine experience level
-        if any(term in description_lower for term in ['senior', '5+ years', '7+ years', 'lead']):
-            exp_level = "Senior Level (5+ years)"
-        elif any(term in description_lower for term in ['3+ years', '4+ years', 'mid-level']):
-            exp_level = "Mid Level (3-5 years)"
-        elif any(term in description_lower for term in ['entry level', 'junior', '0-2 years']):
-            exp_level = "Entry Level (0-2 years)"
-        else:
-            exp_level = "Experience level not specified"
-        
-        result = f"""
-**Job Analysis for {job['company_name']} - {job['job_title']}**
+        # Create detailed prompt for job analysis
+        prompt = f"""
+You are an expert career strategist and job market analyst. Provide a comprehensive analysis of this job opportunity for Robert Enright, considering both the role requirements and his background.
 
-**Key Requirements:**
-{chr(10).join([f"• {req}" for req in requirements[:5]]) if requirements else "• No specific requirements extracted"}
+**JOB DETAILS:**
+- Company: {job['company_name']}
+- Position: {job['job_title']}
+- Job Description: {job.get('job_description', 'No description available')}
+- Location: {job.get('location', 'Not specified')}
+- Salary: {job.get('salary', 'Not specified')}
 
-**Technical Skills Mentioned:**
-{', '.join(found_skills[:8]) if found_skills else 'None specifically identified'}
+**ROBERT'S RESUME:**
+{resume_data}
 
-**Experience Level:** {exp_level}
-**Location:** {job.get('location', 'Not specified')}
-**Salary:** {job.get('salary', 'Not specified')}
-**Current Status:** {job.get('status', 'Not applied')}
+**COMPREHENSIVE JOB ANALYSIS:**
 
-**Job Description Length:** {len(job_description)} characters
+1. **Role Overview & Market Position**:
+   - What this position typically involves day-to-day
+   - Seniority level and career progression potential
+   - Industry context and market demand for this role
+   - Typical salary range and benefits for similar positions
+
+2. **Key Requirements Analysis**:
+   - Must-have technical skills and experience
+   - Preferred qualifications and nice-to-haves
+   - Educational requirements and certifications
+   - Soft skills and cultural fit indicators
+
+3. **Company & Opportunity Assessment**:
+   - Company size, stage, and growth trajectory
+   - Industry position and competitive advantages
+   - Work culture and environment indicators
+   - Career development and learning opportunities
+
+4. **Robert's Fit Assessment (0-100% match)**:
+   - Overall compatibility score with reasoning
+   - Strengths that align perfectly with requirements
+   - Areas where Robert exceeds expectations
+   - Experience gaps or potential concerns
+
+5. **Application Strategy Recommendations**:
+   - Key selling points to emphasize in application
+   - How to position Robert's unique value proposition
+   - Potential objections to address proactively
+   - Timeline and next steps for application
+
+6. **Interview Preparation Priorities**:
+   - Most likely interview questions and topics
+   - Technical areas to review and practice
+   - Company research focus areas
+   - Questions Robert should prepare to ask
+
+7. **Decision Factors**:
+   - Pros and cons of this opportunity for Robert's career
+   - How this role fits into his career trajectory
+   - Potential red flags or concerns to investigate
+   - Alternative approaches if not selected
+
+Provide specific, actionable insights that will help Robert make an informed decision about pursuing this opportunity and optimize his approach if he decides to apply.
         """
         
-        return result.strip()
+        try:
+            # Use the AI chat method to analyze the job
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert career strategist with deep knowledge of job markets, recruitment practices, and career development. Provide detailed, strategic analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1800
+            )
+            
+            analysis = response.choices[0].message.content.strip()
+            
+            return f"""**COMPREHENSIVE JOB ANALYSIS: {job['company_name']} - {job['job_title']}**
+
+{analysis}
+
+---
+*Analysis based on current job market trends and your specific background*
+"""
+        
+        except Exception as e:
+            return f"Error analyzing job: {str(e)}"
+    
+    def _help_apply(self, job_id: int) -> str:
+        """Generate comprehensive application strategy and action plan."""
+        job = self._get_job_data(job_id)
+        if not job:
+            return f"No job found with ID {job_id}"
+        
+        # Get user's resume data for context
+        resume_data = self._get_user_resume()
+        
+        # Create detailed prompt for application strategy
+        prompt = f"""
+You are an expert career strategist and application optimization specialist. Create a comprehensive, step-by-step application strategy for Robert Enright for this specific job opportunity.
+
+**JOB DETAILS:**
+- Company: {job['company_name']}
+- Position: {job['job_title']}
+- Job Description: {job.get('job_description', 'No description available')}
+- Location: {job.get('location', 'Not specified')}
+- Salary: {job.get('salary', 'Not specified')}
+
+**ROBERT'S RESUME:**
+{resume_data}
+
+**COMPREHENSIVE APPLICATION STRATEGY:**
+
+1. **Application Readiness Assessment**:
+   - Current match level (0-100%) and reasoning
+   - Key strengths to leverage
+   - Critical gaps to address before applying
+   - Estimated application competitiveness
+
+2. **Resume Optimization Strategy**:
+   - Specific sections to modify for this role
+   - Keywords and phrases to incorporate naturally
+   - Achievements and metrics to emphasize
+   - Skills section updates and reordering priorities
+   - ATS optimization recommendations
+
+3. **Cover Letter Strategy**:
+   - Key themes and messaging to emphasize
+   - Specific company/role research to incorporate
+   - Personal narrative and value proposition
+   - How to address any potential concerns
+   - Call-to-action and closing strategy
+
+4. **Company Research Action Plan**:
+   - Essential company information to gather
+   - Recent news, developments, and initiatives to research
+   - Key people to research (hiring manager, team leads)
+   - Company culture and values alignment points
+   - Industry trends and challenges to understand
+
+5. **Application Timing & Channel Strategy**:
+   - Best time/day to submit application
+   - Recommended application channels (company site vs. LinkedIn vs. referrals)
+   - Networking opportunities within the company
+   - Follow-up timeline and approach
+
+6. **Pre-Application Skill Building** (if needed):
+   - Priority skills/certifications to acquire quickly
+   - Portfolio projects or examples to develop
+   - Professional development opportunities
+   - Timeline for skill gaps to be addressed
+
+7. **Interview Preparation Preview**:
+   - Key interview formats to expect (technical, behavioral, case study)
+   - Top 5 questions likely to be asked
+   - Technical assessment preparation needed
+   - Presentation or portfolio preparation requirements
+
+8. **Application Success Metrics & Backup Plan**:
+   - How to track application progress
+   - Follow-up schedule and touchpoints
+   - Alternative approaches if no initial response
+   - Similar roles/companies to pursue in parallel
+
+9. **30-Day Action Plan**:
+   - Week 1: Immediate preparation tasks
+   - Week 2: Application submission and initial follow-up
+   - Week 3-4: Continued networking and follow-up activities
+   - Contingency planning for different response scenarios
+
+Provide specific, actionable steps that Robert can execute immediately to maximize his chances of success with this application.
+        """
+        
+        try:
+            # Use the AI chat method to generate application strategy
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert career strategist specializing in application optimization and job search strategy. Provide detailed, actionable guidance."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                max_tokens=2000
+            )
+            
+            strategy = response.choices[0].message.content.strip()
+            
+            return f"""**COMPREHENSIVE APPLICATION STRATEGY: {job['company_name']} - {job['job_title']}**
+
+{strategy}
+
+---
+*Strategic guidance based on your background and current job market best practices*
+"""
+        
+        except Exception as e:
+            return f"Error generating application strategy: {str(e)}"
     
     def _optimize_resume(self, job_id: int) -> str:
         """Optimize resume for the given job."""
@@ -382,7 +524,7 @@ class OpenAIJobAgent:
         return result
     
     def _generate_cover_letter(self, job_id: int) -> str:
-        """Generate a cover letter for the specified job."""
+        """Generate a cover letter for the specified job using AI with user preferences."""
         job = self._get_job_data(job_id)
         if not job:
             return f"No job found with ID {job_id}"
@@ -394,40 +536,256 @@ class OpenAIJobAgent:
         except FileNotFoundError:
             preferences = "Cover letter preferences not found."
         
-        # Simple template-based cover letter generation
-        template = f"""
-**COVER LETTER GENERATED FOR: {job['company_name']} - {job['job_title']}**
+        # Get user's resume data for context
+        resume_data = self._get_user_resume()
+        
+        # Create detailed prompt for AI cover letter generation
+        prompt = f"""
+You are writing a personalized cover letter for Robert Enright. Follow his specific preferences exactly.
 
-Based on your preferences and the job requirements, here's a draft cover letter:
+**JOB DETAILS:**
+- Company: {job['company_name']}
+- Position: {job['job_title']}
+- Job Description: {job.get('job_description', 'No description available')}
+- Location: {job.get('location', 'Not specified')}
 
----
+**ROBERT'S COVER LETTER PREFERENCES:**
+{preferences}
 
-Dear Hiring Manager,
+**ROBERT'S BACKGROUND (for context):**
+{resume_data}
 
-I'm excited to apply for the {job['job_title']} position at {job['company_name']}. Your company's focus on [RESEARCH COMPANY VALUES] aligns with my professional values and career aspirations.
+**INSTRUCTIONS:**
+1. Write a complete, polished cover letter following Robert's preferences exactly
+2. Use the conversational, human tone he prefers - not overly formal or AI-sounding
+3. Follow the 5-paragraph structure he outlined
+4. Keep to 350-400 words maximum
+5. Use em dashes and his preferred punctuation style
+6. Avoid corporate speak, buzzwords, and passive language
+7. Make specific connections between his experience and this role
+8. Research and reference something specific about the company/role
+9. End with a sincere, confident closing (not robotic)
 
-In my previous roles, I've developed experience in [RELEVANT SKILLS FROM RESUME] which directly relates to your requirements for [KEY REQUIREMENT FROM JOB]. My background in [RELEVANT AREA] positions me well to contribute to your team's success.
-
-What particularly interests me about this role is [SPECIFIC ASPECT OF THE JOB]. I'm confident that my experience and collaborative approach would add value to {job['company_name']}'s continued growth.
-
-I'd welcome the opportunity to discuss how my background can contribute to your team's objectives.
-
-Best regards,
-
-Robert Enright
-
----
-
-**CUSTOMIZATION NOTES:**
-- Research {job['company_name']}'s recent news or initiatives to personalize the opening
-- Replace bracketed placeholders with specific examples from your experience
-- Highlight 2-3 key achievements that align with the job requirements
-
-**USER PREFERENCES:**
-{preferences}...
+Write the cover letter now - provide only the letter content, no additional notes or explanations.
         """
         
-        return template.strip()
+        try:
+            # Use the AI chat method to generate the cover letter
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert cover letter writer who follows specific user preferences exactly. Write natural, human-sounding cover letters."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=800
+            )
+            
+            cover_letter = response.choices[0].message.content.strip()
+            
+            return f"""**COVER LETTER FOR: {job['company_name']} - {job['job_title']}**
+
+{cover_letter}
+
+---
+*Generated using your personal preferences from robs_cover_letter_preferences.md*
+"""
+        
+        except Exception as e:
+            return f"Error generating cover letter: {str(e)}"
+    
+    def _match_skills(self, job_id: int) -> str:
+        """Analyze how well the user's skills match a specific job with detailed comparison."""
+        job = self._get_job_data(job_id)
+        if not job:
+            return f"No job found with ID {job_id}"
+        
+        # Get user's resume data for context
+        resume_data = self._get_user_resume()
+        
+        # Create detailed prompt for skills matching analysis
+        prompt = f"""
+You are an expert career advisor and skills assessment specialist. Conduct a comprehensive analysis of how well Robert Enright's background matches the requirements for this specific position.
+
+**JOB DETAILS:**
+- Company: {job['company_name']}
+- Position: {job['job_title']}
+- Job Description: {job.get('job_description', 'No description available')}
+- Location: {job.get('location', 'Not specified')}
+- Salary: {job.get('salary', 'Not specified')}
+
+**ROBERT'S RESUME:**
+{resume_data}
+
+**ANALYSIS REQUIRED:**
+
+1. **Skills Match Score (0-100%)**: Provide an overall compatibility score
+
+2. **Technical Skills Analysis**:
+   - List required technical skills from the job posting
+   - Match each requirement to Robert's experience (Strong Match/Partial Match/Missing)
+   - Highlight relevant technologies, tools, and software Robert knows
+
+3. **Experience Level Comparison**:
+   - Compare years of experience required vs. Robert's background
+   - Assess seniority level match (entry/mid/senior)
+   - Evaluate industry experience relevance
+
+4. **Key Strengths for This Role**:
+   - Top 5 strengths from Robert's background that align perfectly
+   - Specific examples and achievements that demonstrate these strengths
+   - Quantifiable results and impacts
+
+5. **Skill Gaps & Development Areas**:
+   - Missing skills or technologies mentioned in the job posting
+   - Areas where Robert could strengthen his profile
+   - Suggested learning priorities (ranked by importance)
+
+6. **Competitive Advantages**:
+   - Unique aspects of Robert's background that stand out
+   - Cross-functional skills that add value
+   - Leadership, project management, or specialized experience
+
+7. **Application Strategy Recommendations**:
+   - How to position Robert's experience in the application
+   - Key selling points to emphasize in cover letter/interview
+   - Potential concerns to address proactively
+
+8. **Interview Preparation Focus**:
+   - Technical areas to review before the interview
+   - Experience examples to prepare and practice
+   - Questions Robert should ask to demonstrate fit
+
+Provide specific, actionable insights that will help Robert understand his competitive position and optimize his application strategy.
+        """
+        
+        try:
+            # Use the AI chat method to analyze skills match
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert career advisor specializing in skills assessment and job matching. Provide detailed, specific analysis with concrete examples."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1500
+            )
+            
+            analysis = response.choices[0].message.content.strip()
+            
+            return f"""**SKILLS & EXPERIENCE MATCH ANALYSIS: {job['company_name']} - {job['job_title']}**
+
+{analysis}
+
+---
+*Analysis based on your current resume and the specific job requirements*
+"""
+        
+        except Exception as e:
+            return f"Error analyzing skills match: {str(e)}"
+    
+    def _prepare_interview(self, job_id: int, company_name: str) -> str:
+        """Generate comprehensive interview preparation based on job requirements and user's background."""
+        job = self._get_job_data(job_id)
+        if not job:
+            return f"No job found with ID {job_id}"
+        
+        # Get user's resume data for context
+        resume_data = self._get_user_resume()
+        
+        # Create detailed prompt for interview preparation
+        prompt = f"""
+You are an expert interview coach and career strategist. Create a comprehensive interview preparation guide for Robert Enright based on his specific background and this job opportunity.
+
+**JOB DETAILS:**
+- Company: {job['company_name']}
+- Position: {job['job_title']}
+- Job Description: {job.get('job_description', 'No description available')}
+- Location: {job.get('location', 'Not specified')}
+- Salary: {job.get('salary', 'Not specified')}
+
+**ROBERT'S RESUME:**
+{resume_data}
+
+**COMPREHENSIVE INTERVIEW PREPARATION GUIDE:**
+
+1. **Most Likely Interview Questions (8-10 questions)**:
+   - Technical questions based on job requirements
+   - Behavioral questions relevant to the role
+   - Situational questions testing problem-solving
+   - Questions about Robert's specific experience and background
+
+2. **Prepared Response Framework**:
+   For each question, provide:
+   - Key points Robert should cover
+   - Specific examples from his experience to mention
+   - Quantifiable achievements to highlight
+   - How to connect his background to their needs
+
+3. **Technical Deep-Dive Areas**:
+   - Technologies/tools they'll likely test knowledge on
+   - Technical challenges or scenarios they might present
+   - Industry-specific knowledge to review
+   - Best practices and methodologies to discuss
+
+4. **STAR Method Examples**:
+   - 3-4 prepared STAR (Situation, Task, Action, Result) stories
+   - Match stories to common behavioral questions
+   - Include specific metrics and outcomes
+   - Cover different aspects: leadership, problem-solving, collaboration, innovation
+
+5. **Questions Robert Should Ask**:
+   - About the role and day-to-day responsibilities
+   - About team structure and collaboration
+   - About company culture and growth opportunities
+   - About challenges and success metrics
+   - Technical questions that show expertise
+
+6. **Company-Specific Talking Points**:
+   - Recent company news or developments to reference
+   - Company values and culture alignment
+   - How Robert's experience relates to their business
+   - Why he's specifically interested in this company
+
+7. **Potential Concerns & How to Address**:
+   - Any gaps in experience and how to position them
+   - Career transitions or changes to explain
+   - Why he's leaving current role (if applicable)
+   - Salary expectations and negotiation talking points
+
+8. **Interview Day Strategy**:
+   - Key strengths to emphasize throughout
+   - Professional examples to weave into answers
+   - Follow-up questions to demonstrate engagement
+   - Closing statements that reinforce fit
+
+Focus on practical, actionable guidance that Robert can use to confidently navigate the interview and demonstrate his value as a candidate.
+        """
+        
+        try:
+            # Use the AI chat method to generate interview preparation
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert interview coach with extensive experience preparing candidates for technical and behavioral interviews. Provide specific, actionable guidance."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                max_tokens=2000
+            )
+            
+            preparation_guide = response.choices[0].message.content.strip()
+            
+            return f"""**INTERVIEW PREPARATION GUIDE: {job['company_name']} - {job['job_title']}**
+
+{preparation_guide}
+
+---
+*Tailored preparation based on your resume and the specific role requirements*
+"""
+        
+        except Exception as e:
+            return f"Error generating interview preparation: {str(e)}"
     
     def _research_company(self, company_name: str) -> str:
         """Research the company using AI agent with web search capabilities."""
@@ -830,21 +1188,3 @@ def get_openai_agent_suggestions(agent: OpenAIJobAgent) -> List[str]:
     return agent.suggest_next_actions()
 
 
-# Predefined prompt templates for common tasks
-OPENAI_COMMON_PROMPTS = {
-    "analyze_job": "Please analyze job ID {job_id} and tell me what I should know about this position.",
-    "help_apply": "Help me apply to job ID {job_id}. I want a complete application strategy including resume optimization, cover letter, and company research.",
-    "research_company": "Research {company_name} and provide insights for my job application.",
-    "optimize_resume": "Help me optimize my resume for job ID {job_id}. Tailor my resume to the job description and company.",
-    "job_match": "How well do I match job ID {job_id}? Please provide a detailed compatibility analysis.",
-    "cover_letter": "Generate a cover letter for job ID {job_id}.",
-    "interview_prep": "Help me prepare for an interview for job ID {job_id} at {company_name} for the {job_title} position.",
-    "career_advice": "Based on my current job applications, what career advice do you have for me?"
-}
-
-
-def get_openai_prompt_template(template_key: str, **kwargs) -> str:
-    """Get a formatted prompt template for OpenAI agent."""
-    if template_key in OPENAI_COMMON_PROMPTS:
-        return OPENAI_COMMON_PROMPTS[template_key].format(**kwargs)
-    return ""
