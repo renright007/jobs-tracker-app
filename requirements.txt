@@ -8,6 +8,7 @@ plotly==5.19.0
 
 # 🤖 AI/ML Dependencies  
 openai==1.35.0
+tiktoken==0.7.0
 
 # 🎨 UI/UX Components
 streamlit-option-menu==0.3.12

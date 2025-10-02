@@ -7,6 +7,14 @@ from utils import read_secrets, init_openai_client
 import time
 from datetime import datetime
 from utils import get_db_connection
+from typing import Dict, Tuple
+
+# Token counting for API limits
+try:
+    import tiktoken
+    TIKTOKEN_AVAILABLE = True
+except ImportError:
+    TIKTOKEN_AVAILABLE = False
 
 def open_webpage(url):
     """
@@ -252,50 +260,131 @@ def format_for_ai_parsing(div_dict):
     
     return "\n".join(formatted_text)
 
+def count_tokens(text: str, model: str = "gpt-3.5-turbo-16k") -> int:
+    """Count tokens in text for the specified model."""
+    if not TIKTOKEN_AVAILABLE:
+        # Rough estimation: ~4 characters per token
+        return len(text) // 4
+    
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+        return len(encoding.encode(text))
+    except Exception:
+        # Fallback estimation
+        return len(text) // 4
+
+
+def validate_and_prepare_text(text: str, max_tokens: int = 12000) -> Tuple[str, Dict]:
+    """
+    Validate text length and prepare it for API call.
+    
+    Args:
+        text (str): Input text to validate
+        max_tokens (int): Maximum tokens allowed for input
+        
+    Returns:
+        Tuple[str, Dict]: (processed_text, metadata)
+    """
+    token_count = count_tokens(text)
+    
+    metadata = {
+        "original_length": len(text),
+        "token_count": token_count,
+        "truncated": False,
+        "chunks": 1
+    }
+    
+    if token_count <= max_tokens:
+        return text, metadata
+    
+    # If text is too long, intelligently truncate
+    if TIKTOKEN_AVAILABLE:
+        try:
+            encoding = tiktoken.encoding_for_model("gpt-3.5-turbo-16k")
+            tokens = encoding.encode(text)
+            truncated_tokens = tokens[:max_tokens]
+            processed_text = encoding.decode(truncated_tokens)
+            metadata["truncated"] = True
+            metadata["token_count"] = len(truncated_tokens)
+            return processed_text, metadata
+        except Exception:
+            pass
+    
+    # Fallback: character-based truncation
+    estimated_chars = max_tokens * 4
+    processed_text = text[:estimated_chars]
+    metadata["truncated"] = True
+    metadata["token_count"] = count_tokens(processed_text)
+    
+    return processed_text, metadata
+
 def scraper_openai_agent(text):
     """
-    Scrape the webpage and return the div classes and text.
+    Extract job information from text using OpenAI API with proper token management.
     """
     # Initialize OpenAI client
     client = init_openai_client()
     if client is None:
         print("OpenAI client initialization failed. The AI Chat Bot feature will be disabled.")
+        return None
 
-    # Define the prompt
-    prompt = "Please help me extract the information from the text the unstructured text provided."
+    # Validate and prepare text
+    processed_text, metadata = validate_and_prepare_text(text, max_tokens=12000)
+    
+    # Log token information
+    print(f"Input text: {metadata['original_length']} chars, {metadata['token_count']} tokens")
+    if metadata['truncated']:
+        print("⚠️ Warning: Input text was truncated due to length limits")
 
-    # Define the system message
-    system_message = f"""
-    You are an intelligent extraction agent. Given a snippet of **text**, scrape detailed information about the relevant below information:
+    # Define the system message (optimized for token efficiency)
+    system_message = """
+    You are an intelligent extraction agent. Extract detailed job information from the provided text:
 
-        - Company Name
-        - Job Title
-        - Job Description - 
-            Usually this will be the entirity of the text chunk. Ideally you want to cut the headers and footers.
-            MUST INCLUDE ALL DESCRIPTION TEXT RELATED TO THE JOB DESCRIPTION.
-            DO NOT MISS ANYTHING WITHIN THE LARGE DESCRIPTION TEXT, USUALLY ENDING WITH A LINK TO APPLY or BENEFIT INFORMATION. 
-            The job description should be word for word and include any large chunks of text the company, role, tasks, skills, pay, external or additional information, location details or anything else of interest to a potential candidate. 
-            DO NOT MISS ANYTHING!!!!!!!
-        - Job Location - Include city and country for example: "New York, USA"
-        - Job Salary - Include salary range for example: "$100,000 - $120,000 per year"
+    REQUIRED FIELDS:
+    - Company Name
+    - Job Title  
+    - Job Description - CRITICAL: Include the COMPLETE job description with ALL details:
+        * Company overview and role details
+        * All responsibilities and requirements
+        * Skills, qualifications, and experience needed
+        * Compensation, benefits, and perks
+        * Location and work arrangement details
+        * Application instructions and deadlines
+        * Any additional relevant information
+        
+        PRESERVE THE ENTIRE DESCRIPTION - DO NOT TRUNCATE OR SUMMARIZE!
+        
+    - Job Location - Format: "City, Country" (e.g., "New York, USA")
+    - Job Salary - Include full range if available (e.g., "$100,000 - $120,000 per year") or "Not Listed"
 
-    Your task is to analyze the text and return the information that best applies. Do not return duplicate information.
-
-        Text: "{text}"  
-
-    Return only the following information in a dictionary format: Company Name, Job Title, Job Description, Job Location, Job Salary.
+    Return ONLY a valid JSON dictionary with these exact keys: "Company Name", "Job Title", "Job Description", "Job Location", "Job Salary".
     """
 
-    # Generate AI response using OpenAI API
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": prompt}
-        ]
-    )
+    # Define the user message with the content
+    truncation_note = " [NOTE: Input text was truncated due to length limits]" if metadata["truncated"] else ""
+    user_message = f"""
+    Please extract the job information from this text. Ensure the Job Description field contains the COMPLETE, UNTRUNCATED description:
 
-    return response.choices[0].message.content
+    {processed_text}{truncation_note}
+    """
+
+    try:
+        # Generate AI response using OpenAI API with proper token limits
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo-16k",  # Use 16k model for larger context
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=8000,  # Allow for longer responses
+            temperature=0.1   # Low temperature for consistent, factual extraction
+        )
+
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Error in OpenAI API call: {str(e)}")
+        return f"Error: {str(e)}"
 
 def get_longest_text_content(driver):
     """
