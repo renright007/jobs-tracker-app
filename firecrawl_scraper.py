@@ -158,6 +158,39 @@ class FirecrawlScraper:
         }
 
 
+def validate_and_prepare_text(text: str, max_tokens: int = 12000) -> Tuple[str, Dict]:
+    """
+    Validate text length and prepare it for API call using character-based estimation.
+
+    Args:
+        text (str): Input text to validate
+        max_tokens (int): Maximum tokens allowed for input
+
+    Returns:
+        Tuple[str, Dict]: (processed_text, metadata)
+    """
+    # Estimate token count: ~4 characters per token
+    estimated_tokens = len(text) // 4
+
+    metadata = {
+        "original_length": len(text),
+        "token_count": estimated_tokens,
+        "truncated": False,
+        "chunks": 1
+    }
+
+    if estimated_tokens <= max_tokens:
+        return text, metadata
+
+    # Character-based truncation
+    estimated_chars = max_tokens * 4
+    processed_text = text[:estimated_chars]
+    metadata["truncated"] = True
+    metadata["token_count"] = max_tokens
+
+    return processed_text, metadata
+
+
 def scraper_openai_agent(text: str) -> str:
     """
     Extract job information from text using OpenAI API with proper token management.
@@ -172,7 +205,10 @@ def scraper_openai_agent(text: str) -> str:
     client = init_openai_client()
     if client is None:
         return json.dumps({"error": "OpenAI client initialization failed. Please check your API key configuration."})
-    
+
+    # Validate and prepare text
+    processed_text, metadata = validate_and_prepare_text(text, max_tokens=12000)
+
     # Define the system message (optimized for token efficiency)
     system_message = """
     You are an intelligent extraction agent. Extract detailed job information from the provided text:
@@ -199,10 +235,11 @@ def scraper_openai_agent(text: str) -> str:
     """
     
     # Define the user message with the content
+    truncation_note = " [NOTE: Input text was truncated due to length limits]" if metadata["truncated"] else ""
     user_message = f"""
     Please extract the job information from this text. Ensure the Job Description field contains the COMPLETE, UNTRUNCATED description with all details preserved:
 
-    {text}
+    {processed_text}{truncation_note}
     """
     
     try:
@@ -213,7 +250,7 @@ def scraper_openai_agent(text: str) -> str:
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message}
             ],
-            max_tokens=8000,  # Allow for longer responses
+            max_tokens=4096,  # Allow for longer responses
             temperature=0.1   # Low temperature for consistent, factual extraction
         )
         
