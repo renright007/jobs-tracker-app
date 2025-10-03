@@ -24,13 +24,6 @@ import json
 # Import existing utilities
 from utils import init_openai_client
 
-# Token counting for API limits
-try:
-    import tiktoken
-    TIKTOKEN_AVAILABLE = True
-except ImportError:
-    TIKTOKEN_AVAILABLE = False
-
 try:
     from firecrawl import FirecrawlApp
     FIRECRAWL_AVAILABLE = True
@@ -165,65 +158,6 @@ class FirecrawlScraper:
         }
 
 
-def count_tokens(text: str, model: str = "gpt-3.5-turbo-16k") -> int:
-    """Count tokens in text for the specified model."""
-    if not TIKTOKEN_AVAILABLE:
-        # Rough estimation: ~4 characters per token
-        return len(text) // 4
-    
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-        return len(encoding.encode(text))
-    except Exception:
-        # Fallback estimation
-        return len(text) // 4
-
-
-def validate_and_prepare_text(text: str, max_tokens: int = 12000) -> Tuple[str, Dict]:
-    """
-    Validate text length and prepare it for API call.
-    
-    Args:
-        text (str): Input text to validate
-        max_tokens (int): Maximum tokens allowed for input
-        
-    Returns:
-        Tuple[str, Dict]: (processed_text, metadata)
-    """
-    token_count = count_tokens(text)
-    
-    metadata = {
-        "original_length": len(text),
-        "token_count": token_count,
-        "truncated": False,
-        "chunks": 1
-    }
-    
-    if token_count <= max_tokens:
-        return text, metadata
-    
-    # If text is too long, intelligently truncate
-    if TIKTOKEN_AVAILABLE:
-        try:
-            encoding = tiktoken.encoding_for_model("gpt-3.5-turbo-16k")
-            tokens = encoding.encode(text)
-            truncated_tokens = tokens[:max_tokens]
-            processed_text = encoding.decode(truncated_tokens)
-            metadata["truncated"] = True
-            metadata["token_count"] = len(truncated_tokens)
-            return processed_text, metadata
-        except Exception:
-            pass
-    
-    # Fallback: character-based truncation
-    estimated_chars = max_tokens * 4
-    processed_text = text[:estimated_chars]
-    metadata["truncated"] = True
-    metadata["token_count"] = count_tokens(processed_text)
-    
-    return processed_text, metadata
-
-
 def scraper_openai_agent(text: str) -> str:
     """
     Extract job information from text using OpenAI API with proper token management.
@@ -238,9 +172,6 @@ def scraper_openai_agent(text: str) -> str:
     client = init_openai_client()
     if client is None:
         return json.dumps({"error": "OpenAI client initialization failed. Please check your API key configuration."})
-    
-    # Validate and prepare text
-    processed_text, metadata = validate_and_prepare_text(text, max_tokens=12000)
     
     # Define the system message (optimized for token efficiency)
     system_message = """
@@ -268,11 +199,10 @@ def scraper_openai_agent(text: str) -> str:
     """
     
     # Define the user message with the content
-    truncation_note = " [NOTE: Input text was truncated due to length limits]" if metadata["truncated"] else ""
     user_message = f"""
     Please extract the job information from this text. Ensure the Job Description field contains the COMPLETE, UNTRUNCATED description with all details preserved:
 
-    {processed_text}{truncation_note}
+    {text}
     """
     
     try:
