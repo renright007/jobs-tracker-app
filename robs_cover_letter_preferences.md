@@ -9,7 +9,7 @@
 1. **Opening paragraph**:  
    - Highlight why I’m excited about the specific role or team.  
    - Avoid generic statements like “I’m writing to express…”
-   - Grab their attention but in a clever manner.
+   - Grab their attention but in a clever manner, but do not over sensationalize it. Avoid being cheesy.
 
 2. **Experience overview**:  
    - Summarize my background in a few key points.  
@@ -27,7 +27,7 @@
 
 5. **Closing**:  
    - End with something sincere and confident.  
-   - Avoid robotic closings like “I look forward to hearing from you.”
+   - Avoid robotic closings like “I look forward to hearing from you." or "I am thrilled..."
 
 ## 🧠 Writing Style
 - Prefer **em dashes** (—) or commas for natural rhythm; avoid semicolons.
