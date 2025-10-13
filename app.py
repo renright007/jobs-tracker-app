@@ -5,7 +5,7 @@ import openai
 st.set_page_config(
     layout="wide",
     page_title="Jobs Organiser",
-    page_icon="./assets/RLE - Logo.png",
+    page_icon="./assets/job_hopper_logo.png",
     initial_sidebar_state="expanded"
 )
 
@@ -263,13 +263,11 @@ def create_logo_section():
     """Create the logo section at the top of the sidebar."""
     with st.sidebar:
         # Add logo
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            logo_path = "assets/RLE - Logo 2.0 White.png"
-            if os.path.exists(logo_path):
-                st.image(logo_path, width=200, use_container_width=True)
-            else:
-                st.error(f"Logo file not found at {logo_path}")
+        logo_path = "assets/job_hopper_logo.png"
+        if os.path.exists(logo_path):
+            st.image(logo_path, use_container_width=True)
+        else:
+            st.error(f"Logo file not found at {logo_path}")
         st.markdown("---")  # Add a horizontal line after the logo
 
 def create_auth_section():

@@ -301,7 +301,7 @@ def get_existing_users():
 
 def show_login_page():
     """Display the login page."""
-    st.title("Welcome to My Job Tracker")
+    st.title("Welcome to JobHopper")
     
     # Initialize session state for authentication
     if 'authenticated' not in st.session_state:

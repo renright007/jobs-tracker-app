@@ -148,7 +148,7 @@ def get_custom_css():
     return """
         <style>
         [data-testid="stSidebar"] {
-            background-color: #0097b2;
+            background-color: #5b8c65;
         }
         [data-testid="stSidebar"] .css-1d391kg {
             border-radius: 10px !important;
@@ -183,12 +183,12 @@ def get_menu_style():
     """Return style configuration for the option menu."""
     return {
         "container": {"padding": "5!important", "background-color": "#fafafa"},
-        "icon": {"color": "#0097b2", "font-size": "25px"},
+        "icon": {"color": "#5b8c65", "font-size": "25px"},
         "nav-link": {
             "font-size": "16px",
             "text-align": "left",
             "margin": "0px",
             "--hover-color": "#eee"
         },
-        "nav-link-selected": {"background-color": "#0097b2"},
+        "nav-link-selected": {"background-color": "#5b8c65"},
     }
