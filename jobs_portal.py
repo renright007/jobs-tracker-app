@@ -286,8 +286,8 @@ def show_jobs_portal():
             )
             
             # Submit button
-            get_details = st.form_submit_button("🔥 Scrape with Firecrawl")
-            
+            get_details = st.form_submit_button("🔥 Scrape & Parse with AI")
+
             if get_details and job_url:
                 # Store metadata
                 st.session_state.firecrawl_job_metadata = {
@@ -318,23 +318,43 @@ def show_jobs_portal():
                         if scraped_content and scraped_content.strip():
                             # Store in session state for AI parsing
                             st.session_state.firecrawl_job_description = scraped_content
-                            
-                            # Show performance metrics
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("⏱️ Scrape Time", f"{scrape_time:.2f}s")
-                            with col2:
-                                st.metric("📄 Content Length", f"{len(scraped_content):,} chars")
-                            with col3:
-                                word_count = len(scraped_content.split())
-                                st.metric("📝 Word Count", f"{word_count:,} words")
-                            
-                            # Display the scraped content
-                            st.subheader("📄 Scraped Content")
-                            st.text_area("Job Description (Firecrawl)", value=scraped_content, height=300, key="firecrawl_content_display")
-                            
-                            # Always require manual AI parsing for consistency
-                            st.info("💡 Click 'Parse with AI' below to extract job information")
+
+                            # Automatically parse with AI
+                            with st.spinner("🤖 Parsing with AI..."):
+                                ai_analysis = scraper_openai_agent(scraped_content)
+
+                                # Display AI analysis
+                                st.subheader("🤖 AI Analysis")
+
+                                # Parse AI response
+                                if isinstance(ai_analysis, str):
+                                    try:
+                                        analysis_dict = json.loads(ai_analysis)
+                                    except:
+                                        analysis_dict = {"Analysis": ai_analysis}
+                                else:
+                                    analysis_dict = ai_analysis
+
+                                # Map to our standard format
+                                job_details = {
+                                    'company_name': analysis_dict.get('Company Name', ''),
+                                    'job_title': analysis_dict.get('Job Title', ''),
+                                    'job_description': analysis_dict.get('Job Description', ''),
+                                    'application_url': st.session_state.firecrawl_job_metadata['job_url'],
+                                    'status': 'Not Applied',
+                                    'sentiment': 'Neutral',
+                                    'location': analysis_dict.get('Job Location', 'Not Listed'),
+                                    'salary': analysis_dict.get('Job Salary', 'Not Listed'),
+                                    'applied_date': '',
+                                    'notes': f'Scraped with Firecrawl API in {st.session_state.firecrawl_scrape_time:.2f}s'
+                                }
+
+                                # Store in session state
+                                st.session_state.firecrawl_ai_analysis = job_details
+
+                                # Display the standardized format
+                                st.json(job_details)
+                                st.success("✅ Scraping and AI parsing completed!")
                         else:
                             st.error("❌ Could not extract content from the webpage using Firecrawl")
                             st.info("The page may have restrictions or the content may be behind authentication")
@@ -356,46 +376,7 @@ def show_jobs_portal():
                         # Show debug information
                         st.write("**Debug - Full Response:**")
                         st.json(result)
-        
-        # Show Parse with AI button if we have content (but no AI analysis yet)
-        if st.session_state.firecrawl_job_description and not st.session_state.firecrawl_ai_analysis:
-            if st.button("🤖 Parse with AI", key="firecrawl_parse_ai"):
-                with st.spinner("Analyzing content with AI..."):
-                    # Get AI analysis using the existing function
-                    ai_analysis = scraper_openai_agent(st.session_state.firecrawl_job_description)
-                    
-                    # Display AI analysis
-                    st.subheader("🤖 AI Analysis")
-                    
-                    # Parse AI response
-                    if isinstance(ai_analysis, str):
-                        try:
-                            analysis_dict = json.loads(ai_analysis)
-                        except:
-                            analysis_dict = {"Analysis": ai_analysis}
-                    else:
-                        analysis_dict = ai_analysis
-                    
-                    # Map to our standard format
-                    job_details = {
-                        'company_name': analysis_dict.get('Company Name', ''),
-                        'job_title': analysis_dict.get('Job Title', ''),
-                        'job_description': analysis_dict.get('Job Description', ''),
-                        'application_url': st.session_state.firecrawl_job_metadata['job_url'],
-                        'status': 'Not Applied',
-                        'sentiment': 'Neutral',
-                        'location': analysis_dict.get('Job Location', 'Not Listed'),
-                        'salary': analysis_dict.get('Job Salary', 'Not Listed'),
-                        'applied_date': '',
-                        'notes': f'Scraped with Firecrawl API in {st.session_state.firecrawl_scrape_time:.2f}s'
-                    }
-                    
-                    # Store in session state
-                    st.session_state.firecrawl_ai_analysis = job_details
-                    
-                    # Display the standardized format
-                    st.json(job_details)
-        
+
         # Show save form if we have AI analysis
         if st.session_state.firecrawl_ai_analysis:
             with st.form("save_firecrawl_job_form"):
