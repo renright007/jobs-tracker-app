@@ -5,17 +5,24 @@ import streamlit as st
 from streamlit_shadcn_ui import card
 import plotly.graph_objects as go
 
+# Define color constants for status and sentiment
+STATUS_COLORS = {
+    "Rejected": "#FF4B4B",      # Red
+    "Applied": "#FFD700",       # Yellow
+    "Not Applied": "#1E90FF",   # Blue
+    "No Response": "#FFA500",   # Orange
+    "Offered": "#4CAF50",       # Green
+    "Interviewing": "#9C27B0"   # Purple
+}
+
+SENTIMENT_COLORS = {
+    "Positive": "#000080",      # Navy
+    "Neutral": "#808080",       # Grey
+    "Negative": "#800000"       # Maroon
+}
+
 def get_status_chart(status_counts):
     """Create ECharts configuration for status distribution donut chart."""
-    # Define colors for each status
-    status_colors = {
-        "Rejected": "#FF4B4B",    # Red
-        "Applied": "#FFD700",     # Yellow
-        "Not Applied": "#1E90FF", # Blue
-        "Offered": "#4CAF50",     # Green
-        "Interviewing": "#9C27B0"  # Purple
-    }
-    
     return {
         "title": {
             "text": "Application Status Distribution",
@@ -55,7 +62,7 @@ def get_status_chart(status_counts):
                 {
                     "value": count,
                     "name": status,
-                    "itemStyle": {"color": status_colors.get(status, "#808080")}  # Default to gray if status not found
+                    "itemStyle": {"color": STATUS_COLORS.get(status, "#808080")}  # Default to gray if status not found
                 }
                 for status, count in status_counts.items()
             ]
@@ -64,13 +71,6 @@ def get_status_chart(status_counts):
 
 def get_sentiment_chart(sentiment_counts):
     """Create ECharts configuration for sentiment distribution donut chart."""
-    # Define colors for each sentiment
-    sentiment_colors = {
-        "Positive": "#000080",  # Navy
-        "Neutral": "#808080",   # Grey
-        "Negative": "#800000"   # Maroon
-    }
-    
     return {
         "title": {
             "text": "Application Sentiment Distribution",
@@ -110,7 +110,7 @@ def get_sentiment_chart(sentiment_counts):
                 {
                     "value": count,
                     "name": sentiment,
-                    "itemStyle": {"color": sentiment_colors.get(sentiment, "#808080")}  # Default to gray if sentiment not found
+                    "itemStyle": {"color": SENTIMENT_COLORS.get(sentiment, "#808080")}  # Default to gray if sentiment not found
                 }
                 for sentiment, count in sentiment_counts.items()
             ]
@@ -199,16 +199,7 @@ def get_company_chart(jobs_df):
     """Create ECharts configuration for top 10 companies with stacked status bars."""
     if jobs_df.empty:
         return None
-    
-    # Define colors for each status
-    status_colors = {
-        "Rejected": "#FF4B4B",    # Red
-        "Applied": "#FFD700",     # Yellow
-        "Not Applied": "#1E90FF", # Blue
-        "Offered": "#4CAF50",     # Green
-        "Interviewing": "#9C27B0"  # Purple
-    }
-    
+
     # Get top 10 companies by total applications
     top_companies = jobs_df['company_name'].value_counts().head(10).index.tolist()
     
@@ -232,7 +223,7 @@ def get_company_chart(jobs_df):
             "itemStyle": {
                 "borderRadius": [8, 8, 8, 8],  # Rounded corners for all sides
                 "borderWidth": 0,
-                "color": status_colors.get(status, "#808080")  # Default to gray if status not found
+                "color": STATUS_COLORS.get(status, "#808080")  # Default to gray if status not found
             }
         })
     
@@ -276,16 +267,7 @@ def get_job_titles_chart(jobs_df):
     """Create ECharts configuration for top 10 job titles with stacked status bars."""
     if jobs_df.empty:
         return None
-    
-    # Define colors for each status
-    status_colors = {
-        "Rejected": "#FF4B4B",    # Red
-        "Applied": "#FFD700",     # Yellow
-        "Not Applied": "#1E90FF", # Blue
-        "Offered": "#4CAF50",     # Green
-        "Interviewing": "#9C27B0"  # Purple
-    }
-    
+
     # Get top 10 job titles by total applications and sort in descending order
     title_counts = jobs_df['job_title'].value_counts()
     top_titles = title_counts.head(10).index.tolist()
@@ -310,7 +292,7 @@ def get_job_titles_chart(jobs_df):
             "itemStyle": {
                 "borderRadius": [8, 8, 8, 8],  # Rounded corners for all sides
                 "borderWidth": 0,
-                "color": status_colors.get(status, "#808080")  # Default to gray if status not found
+                "color": STATUS_COLORS.get(status, "#808080")  # Default to gray if status not found
             }
         })
     
