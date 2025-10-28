@@ -1154,7 +1154,7 @@ Remember: You're not just answering questions - you're helping the user succeed 
                 ])
             else:
                 # Analyze job statuses
-                not_applied = len(jobs_df[jobs_df['status'] != 'Applied'])
+                not_applied = len(jobs_df[jobs_df['status'] == 'Not Applied'])
                 applied = len(jobs_df[jobs_df['status'] == 'Applied'])
                 
                 if not_applied > 0:

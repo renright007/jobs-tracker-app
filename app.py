@@ -27,7 +27,7 @@ from utils import (
     get_menu_style
 )
 from streamlit_echarts import st_echarts
-from dashboard_utils import prepare_dashboard_data, show_metrics
+from dashboard_utils import prepare_dashboard_data, show_metrics, show_active_applications_table
 from user_portal import show_user_portal
 from jobs_portal import show_jobs_portal
 from ai_chatbot_portal_openai import show_openai_chatbot as show_ai_chatbot
@@ -208,6 +208,9 @@ def show_dashboard():
     
     # Company Distribution Bar Chart
     st_echarts(options=dashboard_data["company_chart"], height="400px")
+
+    # Active Applications Table
+    show_active_applications_table(jobs_df)
 
 # Main app
 def main():

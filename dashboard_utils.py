@@ -4,6 +4,7 @@ from streamlit_echarts import st_echarts
 import streamlit as st
 from streamlit_shadcn_ui import card
 import plotly.graph_objects as go
+from st_aggrid import AgGrid
 
 # Define color constants for status and sentiment
 STATUS_COLORS = {
@@ -347,10 +348,12 @@ def calculate_metrics(jobs_df):
         # Calculate applications in last 7 days
         last_7_days = datetime.now() - pd.Timedelta(days=7)
         recent_applications = len(jobs_df[jobs_df['date_added'] >= last_7_days])
+        interview_count = len(jobs_df[jobs_df['status'] == 'Interviewing'])
     else:
         avg_per_day = 0
         avg_per_week = 0
         recent_applications = 0
+        interview_count = 0
     
     # Get most common status
     most_common_status = jobs_df['status'].mode()[0] if not jobs_df.empty else "N/A"
@@ -360,7 +363,8 @@ def calculate_metrics(jobs_df):
         "avg_per_day": avg_per_day,
         "avg_per_week": avg_per_week,
         "recent_applications": recent_applications,
-        "most_common_status": most_common_status
+        "most_common_status": most_common_status,
+        "interview_count": interview_count
     }
 
 def prepare_dashboard_data(jobs_df):
@@ -450,7 +454,7 @@ def show_metrics(metrics):
         st.markdown(create_metric_card("Last 7 Days", metrics["recent_applications"]), unsafe_allow_html=True)
     
     with col4:
-        st.markdown(create_metric_card("Most Common Status", metrics["most_common_status"]), unsafe_allow_html=True)
+        st.markdown(create_metric_card("Interviewing", metrics["interview_count"]), unsafe_allow_html=True)
 
 def show_dashboard(dashboard_data):
     """Display the dashboard with all charts and metrics."""
@@ -560,4 +564,40 @@ def create_applications_over_time_chart(df):
         )
     )
     
-    return fig 
+    return fig
+
+def show_active_applications_table(jobs_df):
+    """Display a table of jobs with 'Applied' or 'Interviewing' status, ordered by applied date."""
+    if jobs_df.empty:
+        return
+
+    # Filter for Applied or Interviewing status
+    active_jobs = jobs_df[jobs_df['status'].isin(['Applied', 'Interviewing'])].copy()
+
+    if active_jobs.empty:
+        st.info("No active applications (Applied or Interviewing) to display.")
+        return
+
+    # Convert applied_date to datetime for proper sorting
+    active_jobs['applied_date'] = pd.to_datetime(active_jobs['applied_date'], errors='coerce')
+
+    # Sort by applied_date descending (most recent first)
+    active_jobs = active_jobs.sort_values('applied_date', ascending=False)
+
+    # Select and rename columns for display
+    display_df = active_jobs[['company_name', 'job_title', 'status', 'applied_date', 'application_url', 'job_description']].copy()
+    display_df.columns = ['Company Name', 'Job Title', 'Status', 'Applied Date', 'Application URL', 'Job Description']
+
+    # Format the date for better display
+    display_df['Applied Date'] = display_df['Applied Date'].dt.strftime('%Y-%m-%d')
+
+    # Display the table with a header
+    st.markdown("### Active Applications")
+    st.markdown(f"*Showing {len(display_df)} applications with status 'Applied' or 'Interviewing'*")
+
+    # Display the dataframe with styling
+    AgGrid(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
