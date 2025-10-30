@@ -14,6 +14,7 @@ tiktoken==0.7.0
 streamlit-option-menu==0.3.12
 streamlit-shadcn-ui==0.1.18
 streamlit-echarts==0.4.0
+streamlit-aggrid==1.0.5
 
 # 📄 Document Processing
 PyPDF2==3.0.1
