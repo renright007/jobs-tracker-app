@@ -65,10 +65,7 @@ def show_openai_chatbot():
                 st.write(f"**Company:** {selected_job_data['company_name']}")
                 st.write(f"**Position:** {selected_job_data['job_title']}")
                 st.write(f"**Status:** {selected_job_data['status']}")
-                if selected_job_data.get('location'):
-                    st.write(f"**Location:** {selected_job_data['location']}")
-                if selected_job_data.get('salary'):
-                    st.write(f"**Salary:** {selected_job_data['salary']}")
+                st.write(f"**Description:** {selected_job_data['job_description']}")
             
             st.subheader("💬 Chat with Your OpenAI Assistant")
             
