@@ -564,7 +564,7 @@ You are writing a personalized cover letter for the user. Follow their specific 
 6. Avoid corporate speak, buzzwords, and passive language
 7. Make specific connections between their experience and this role
 8. Research and reference something specific about the company/role
-9. End with a sincere, confident closing (not robotic)
+9. End with a sincere, confident closing (not robotic). Avoid using "I am excited" in the closing paragrpah, instead something like "I would love the opportunity to discuss why I am a good fit for the role with you in person."
 
 Write the cover letter now - provide only the letter content, no additional notes or explanations.
         """
