@@ -13,7 +13,8 @@ STATUS_COLORS = {
     "Not Applied": "#1E90FF",   # Blue
     "No Response": "#FFA500",   # Orange
     "Offered": "#4CAF50",       # Green
-    "Interviewing": "#9C27B0"   # Purple
+    "Interviewing": "#9C27B0",  # Purple
+    "Interviewed - Rejected": "#800000"   # Maroon
 }
 
 SENTIMENT_COLORS = {

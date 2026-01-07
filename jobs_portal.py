@@ -199,7 +199,7 @@ def show_jobs_portal():
                 ["Company Listing", "Indeed", "LinkedIn", "Recruiter", "Upwork"]
             )
             status = st.selectbox("Application Status", 
-                                ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected"])
+                                ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected", "Interviewed - Rejected"])
             sentiment = st.select_slider("Your Sentiment", 
                                        ["Very Negative", "Negative", "Neutral", "Positive", "Very Positive"],
                                        value="Neutral")
@@ -282,7 +282,7 @@ def show_jobs_portal():
             )
             application_status = st.selectbox(
                 "Application Status", 
-                ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected"]
+                ["Not Applied", "Applied", "Interviewing", "Offered", "Rejected", "Interviewed - Rejected"]
             )
             
             # Submit button
