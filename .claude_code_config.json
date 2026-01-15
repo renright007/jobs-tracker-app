@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "alphavantage": {
+      "transport": {
+        "type": "sse",
+        "url": "https://mcp.alphavantage.co/mcp?apikey=W0D7XJIFO6ZBKVJ1"
+      }
+    },
+    "firecrawl": {
+      "transport": {
+        "type": "sse",
+        "url": "https://mcp.firecrawl.dev/fc-91929c4f8eff46479e7e51b7f747108e/v2/mcp"
+      }
+    }
+  }
+}

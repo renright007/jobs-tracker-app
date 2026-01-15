@@ -49,20 +49,13 @@
 - Ambition to be a part of a growing organizations
 
 ## ✅ Sample Cover Letter
-Dear Alpaca Team,
-
-I’ve always been fascinated by the power of technology to make financial markets more accessible. Alpaca’s mission to democratize investing and its commitment to fostering a vibrant open-source community immediately caught my attention. I’m excited about the opportunity to contribute my skills to a company that is shaping the future of financial services.
-
-Over the past decade, I’ve worked across sectors from investment banking to public health, focusing on turning complex data into actionable insights. At Pay Ready, I designed and implemented a knowledge-based AI agent that educated employees while generating performance insights. I also overhauled the Salesforce data infrastructure, creating a more robust path to our centralized Looker database. These projects reinforced my ability to combine technical expertise with business impact.
-The Analytics Engineer role at Alpaca aligns perfectly with what I enjoy most – wrangling large datasets, transforming complex data in Python, building scalable pipelines, and delivering insights that drive decisions. I have extensive experience with SQL, process automation, Python scripting, and BI tools, and I am comfortable working with cloud platforms such as GCP. At CloudKitchens, I gained hands-on experience working with Trino to query and analyze large-scale datasets efficiently. 
-
-I’m eager to contribute my expertise to Alpaca’s data ecosystem and open-source initiatives.
-Collaboration is at the core of my approach. At CloudKitchens, I led the Strategy & Planning team, automating data pipelines and scaling operations globally while working closely with cross-functional stakeholders. I prioritize clear communication, trust, and mentorship, creating environments where teams can deliver their best work.
-
-With both a technical background and a passion for financial markets, I am confident that my experience in data engineering, Python-based transformations, and scalable analytics would make me a strong contributor to Alpaca’s mission. I would welcome the opportunity to help advance your vision of accessible, transparent investing.
-
-Best regards,
-
+Dear Zilch Team,
+Zilch stands out because it isn’t just another payments product. Blending debit, credit, and savings into a single, flexible experience feels genuinely different, and it’s the kind of problem I like working on. Fast-moving, high-ownership environments suit me well, which is why the Senior Data Analyst role caught my attention.
+I’ve spent the last decade working across investment banking, public sector, and product-led tech companies, always focused on turning messy data into decisions people can actually act on. At Pay Ready, I built a knowledge-based AI agent that surfaced operational insights and reduced internal friction, and I rebuilt our Salesforce data flows to create a reliable path into Looker. The common thread has been using data to improve how products work and how teams make decisions.
+This role aligns closely with how I already work. I’m comfortable working with large datasets, analysing customer behaviour, and building models that support growth. SQL, Python, and dbt are core parts of my day-to-day, and I enjoy building self-serve tools that help teams answer their own questions without hand-holding.
+I also care a lot about how teams operate. At CloudKitchens, I helped lead the Strategy & Planning function, automating pipelines and scaling analytics across global teams. Clear communication, trust, and good mentorship mattered just as much as the technical work, and that’s how I try to show up day to day.
+I’d love the chance to talk about how I could contribute to Zilch’s product, support smarter decision-making, and help customers manage their money better.
+Best,
 Robert Enright
 
 
