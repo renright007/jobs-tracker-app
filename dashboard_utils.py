@@ -14,7 +14,8 @@ STATUS_COLORS = {
     "No Response": "#FFA500",   # Orange
     "Offered": "#4CAF50",       # Green
     "Interviewing": "#9C27B0",  # Purple
-    "Interviewed - Rejected": "#800000"   # Maroon
+    "Interviewed - Rejected": "#800000",   # Maroon
+    "Interviewed - Withdrew": "#800000"   # Maroon
 }
 
 SENTIMENT_COLORS = {
@@ -573,10 +574,10 @@ def show_active_applications_table(jobs_df):
         return
 
     # Filter for Applied or Interviewing status
-    active_jobs = jobs_df[jobs_df['status'].isin(['Applied', 'Interviewing'])].copy()
+    active_jobs = jobs_df[jobs_df['status'].isin(['Applied', 'Interviewing', 'Offered'])].copy()
 
     if active_jobs.empty:
-        st.info("No active applications (Applied or Interviewing) to display.")
+        st.info("No active applications (Applied or Interviewing or Offered) to display.")
         return
 
     # Convert applied_date to datetime for proper sorting
